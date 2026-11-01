@@ -128,7 +128,7 @@ const 造坏条目库 = (memories, deleted = []) =>
 
 test('A：正常全字段条目不误伤（含 inference/workspace 新字段）', () => {
   const 全字段 = {
-    id: 'm1', text: '主人喜欢命令行', at: '2026-10-31T00:00:00Z', createdAt: '2026-10-31T00:00:00Z',
+    id: 'm1', text: '用户喜欢命令行', at: '2026-10-31T00:00:00Z', createdAt: '2026-10-31T00:00:00Z',
     category: 'event', scope: 'session', type: 'preference', status: 'confirmed',
     importance: 0.8, evidence: ['e1'], related: ['词'], refinedAt: 1761878400000,
   }

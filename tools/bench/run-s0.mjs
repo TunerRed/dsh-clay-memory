@@ -8,7 +8,7 @@ import { join } from 'node:path'
 // GPT 整改 P2（D 阶段）：默认路径不再硬编码本机临时目录（别人机器上没有），改用仓库内 tools/bench/
 const 仓库根 = fileURLToPath(new URL('../..', import.meta.url))
 const SID = process.env.BENCH_SESSION_ID || 'session-4c622978-0ddd-48d7-945f-a162bdfc9d53'
-const port = Number(process.env.BENCH_PORT || 61021)
+const port = Number(process.env.BENCH_PORT || 8080)
 const 问句文件 = process.env.BENCH_QUERIES || join(仓库根, 'tools/bench/queries.json')
 const 输出文件 = process.env.BENCH_OUTPUT || join(仓库根, 'tools/bench/S0-baseline.json')
 const 后端 = process.env.BENCH_BACKEND === 'sql' ? 'sql' : 'json'

@@ -61,13 +61,13 @@ test('滤掉推测：只摘 type=inference，普通记忆和坏行保留', () =>
 // ---------- 2. /add 透传 + 全局拒绝 ----------
 test('/add inference：证据引用真实记忆、字段透传落库，status 强制 pending', async () => {
   // 先造两条真实证据记忆
-  const 甲 = await 打(核心路由.get('/dsh-clay-memory/add'), { session: 's-infer', text: '主人用命令行跑过很多次任务' })
-  const 乙 = await 打(核心路由.get('/dsh-clay-memory/add'), { session: 's-infer', text: '主人说终端比界面顺手' })
+  const 甲 = await 打(核心路由.get('/dsh-clay-memory/add'), { session: 's-infer', text: '用户用命令行跑过很多次任务' })
+  const 乙 = await 打(核心路由.get('/dsh-clay-memory/add'), { session: 's-infer', text: '用户说终端比界面顺手' })
   assert.equal(甲.码, 200)
   assert.equal(乙.码, 200)
   const { 码, 体 } = await 打(核心路由.get('/dsh-clay-memory/add'), {
     session: 's-infer',
-    text: '主人可能更喜欢命令行操作',
+    text: '用户可能更喜欢命令行操作',
     type: 'inference',
     scope: 'session',
     evidence: [甲.体.id, 乙.体.id],
@@ -89,7 +89,7 @@ test('/add inference：证据引用真实记忆、字段透传落库，status �
 test('/add inference + global：400 拒绝（推测不是事实）', async () => {
   const { 码, 体 } = await 打(核心路由.get('/dsh-clay-memory/add'), {
     session: 's-infer',
-    text: '主人可能更喜欢命令行操作',
+    text: '用户可能更喜欢命令行操作',
     type: 'inference',
     scope: 'global',
   })
@@ -101,7 +101,7 @@ test('/add inference 证据不足两条 / 全无效：400 拒绝', async () => {
   // 不传证据
   let { 码, 体 } = await 打(核心路由.get('/dsh-clay-memory/add'), {
     session: 's-infer',
-    text: '主人最近工作节奏偏快',
+    text: '用户最近工作节奏偏快',
     type: 'inference',
     confidence: '极高', // 不在白名单 → 低
   })
@@ -110,7 +110,7 @@ test('/add inference 证据不足两条 / 全无效：400 拒绝', async () => {
   // 传不存在的 id（全无效）
   ;({ 码, 体 } = await 打(核心路由.get('/dsh-clay-memory/add'), {
     session: 's-infer',
-    text: '主人最近工作节奏偏快',
+    text: '用户最近工作节奏偏快',
     type: 'inference',
     evidence: ['不存在的记忆', '也没有这条'],
   }))
@@ -120,7 +120,7 @@ test('/add inference 证据不足两条 / 全无效：400 拒绝', async () => {
   const 甲 = await 打(核心路由.get('/dsh-clay-memory/add'), { session: 's-infer', text: '证据甲' })
   ;({ 码, 体 } = await 打(核心路由.get('/dsh-clay-memory/add'), {
     session: 's-infer',
-    text: '主人最近工作节奏偏快',
+    text: '用户最近工作节奏偏快',
     type: 'inference',
     evidence: [甲.体.id, 甲.体.id],
   }))
@@ -137,7 +137,7 @@ test('镜像：extra_json 打包/解包，推测字段 json↔sql 形状一致',
     'INSERT OR REPLACE INTO memory (id,scope,session_id,text,at,created_at,importance,source,category,type,fact_key,related_json,extra_json,text_before,refined,refined_skip,superseded_why,wrong,ord,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
   )
   插.run(
-    'inf1', 'session', 's-infer', '主人可能更喜欢命令行操作', '2026-10-31T00:00:00Z', null, 0.5, '模型',
+    'inf1', 'session', 's-infer', '用户可能更喜欢命令行操作', '2026-10-31T00:00:00Z', null, 0.5, '模型',
     'event', 'inference', '', '[]',
     JSON.stringify({ evidence: ['mm-1', 'mm-2'], confidence: '中', status: 'confirmed', 推断域: 'cli', provenance: 'model_inference', confirmedAt: '2026-10-31T01:00:00Z' }),
     null, 0, 0, '', '', 0, null,
@@ -227,7 +227,7 @@ test('/inference promote：转正才进正常流程，来源可追溯', async ()
   const 乙 = await 打(核心路由.get('/dsh-clay-memory/add'), { session: 's-promo', text: '证据乙' })
   const 推 = await 打(核心路由.get('/dsh-clay-memory/add'), {
     session: 's-promo',
-    text: '主人偏好终端',
+    text: '用户偏好终端',
     type: 'inference',
     evidence: [甲.体.id, 乙.体.id],
   })

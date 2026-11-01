@@ -116,7 +116,7 @@ test('/add 非法 scope → 400；inference + workspace → 400', async () => {
   })
   assert.equal(非法.码, 400)
   const 推测 = await 打(核心路由.get('/dsh-clay-memory/add'), {
-    session: 'ws-s1', text: '主人可能喜欢 alpha 的构建脚本', type: 'inference', scope: 'workspace:' + CWD_A,
+    session: 'ws-s1', text: '用户可能喜欢 alpha 的构建脚本', type: 'inference', scope: 'workspace:' + CWD_A,
   })
   assert.equal(推测.码, 400)
   assert.match(推测.体.error, /不能进工作区层/)

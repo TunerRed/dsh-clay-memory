@@ -25,13 +25,13 @@ test('remember/forget/recall 工具真跑一遍，不出现运行时缺引用', 
     const exec = { agent: { session: { id: 'session-probe-0001' } } }
 
     const 记 = makeRememberTool(ctx)
-    const 结果 = await 记.execute({ text: '鲸鱼娘今天在验证拆层之后的工具链', importance: 0.5 }, exec)
+    const 结果 = await 记.execute({ text: '小助手今天在验证拆层之后的工具链', importance: 0.5 }, exec)
     assert.equal(结果.ok, true, 'remember 应该成功：' + JSON.stringify(结果))
 
     const 忘 = makeForgetTool(ctx)
     const 找 = makeRecallTool(ctx)
     await 忘.execute({}, exec).catch(() => {})
-    const 找结果 = await 找.execute({ query: '鲸鱼娘' }, exec)
+    const 找结果 = await 找.execute({ query: '小助手' }, exec)
     assert.equal(找结果.ok, true, 'recall 应该成功：' + JSON.stringify(找结果))
 
     const 报错 = 线索.filter((m) => /is not defined|is not a function|Cannot read prop/.test(m))

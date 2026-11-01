@@ -21,7 +21,7 @@
 //   node tools/migrate-facts.mjs                       # 看一眼，什么都不改
 //   node tools/migrate-facts.mjs --apply               # 真搬（会话库里的副本留着）
 //   node tools/migrate-facts.mjs --apply --purge       # 搬完把会话库里的副本删掉
-//   node tools/migrate-facts.mjs --home G:\tmp\home\.dsh --apply
+//   node tools/migrate-facts.mjs --home <DSH_HOME 目录> --apply
 //   node tools/migrate-facts.mjs --apply --force       # 标记说搬过了也再扫一遍
 //
 // 退出码：0 成功（含 dry-run）/ 1 出错

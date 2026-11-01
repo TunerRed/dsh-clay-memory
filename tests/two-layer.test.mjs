@@ -34,7 +34,7 @@ const ids = (list) => (list || []).map((m) => m.id).sort()
 // ---------- 1. 路径拆分 ----------
 test('事实写进 _facts.json，事件留在会话库', () => {
   const d = plugin.loadStore('s1')
-  d.memories.push(fact('f1', '主人喜欢大白饭'), event('e1', '主人今天有点累'))
+  d.memories.push(fact('f1', '用户喜欢大白饭'), event('e1', '用户今天有点累'))
   plugin.saveStore('s1', d)
   assert.ok(有事实文件(), '事实库该被创建')
   assert.deepEqual(ids(读事实().memories), ['f1'])
@@ -60,14 +60,14 @@ test('事实跨会话可见，事件只属于自己那个会话', () => {
 })
 
 test('同一个 id 两边都有时只认事实库那份（迁移留下的副本按 id 去重）', () => {
-  写会话('s3', { memories: [fact('f1', '主人喜欢大白饭（旧副本）'), event('e3', 's3 的事件')] })
+  写会话('s3', { memories: [fact('f1', '用户喜欢大白饭（旧副本）'), event('e3', 's3 的事件')] })
   const d = plugin.loadStore('s3')
   assert.deepEqual(ids(d.memories), ['e3', 'f1'])
-  assert.equal(d.memories.find((m) => m.id === 'f1').text, '主人喜欢大白饭', '事实库那份赢')
+  assert.equal(d.memories.find((m) => m.id === 'f1').text, '用户喜欢大白饭', '事实库那份赢')
 })
 
 test('同一条事实换了 id（两个会话各自记了一遍）只露一条', () => {
-  写会话('s4', { memories: [fact('a-1', '  主人喜欢大白饭 ') , event('e4', 's4 的事件')] })
+  写会话('s4', { memories: [fact('a-1', '  用户喜欢大白饭 ') , event('e4', 's4 的事件')] })
   const d = plugin.loadStore('s4')
   const 命中 = d.memories.filter((m) => String(m.text).includes('大白饭'))
   assert.equal(命中.length, 1, '归一化之后算同一条')
@@ -133,7 +133,7 @@ test('彻底清掉事实之后，会话库里的副本不会把它复活', () =>
 // ---------- 5. 写入合并（同步，不交错）----------
 test('连着两次写入不互相吞（后一次读到盘上的新内容再合并）', () => {
   const a = plugin.loadStore('s9')
-  a.memories.push(fact('f9', '主人晚上喜欢喝牛奶'))
+  a.memories.push(fact('f9', '用户晚上喜欢喝牛奶'))
   plugin.saveStore('s9', a)
   // 模拟「另一个任务手里握着**旧**快照」（照 2026-10-24 那次静默丢失的场景）
   const 旧快照 = plugin.loadStore('s9')
@@ -189,7 +189,7 @@ function host(mod = plugin, liveAgents = []) {
 test('copy-to 只复制事件，事实不跟着跑（它本来就是共享的）', async () => {
   const h = host()
   const 源 = plugin.loadStore('s1')
-  源.memories.push(fact('f12', '主人在用 DSH'), event('e12', 's1 的独有事件'))
+  源.memories.push(fact('f12', '用户在用 DSH'), event('e12', 's1 的独有事件'))
   plugin.saveStore('s1', 源)
   const out = await h.post('/copy-to', { session: 's1', to: 's12' })
   assert.equal(out.ok, true)
@@ -233,13 +233,13 @@ function 造老库(基) {
   const 老 = (id, text, category, 日 = '2026-09-01') => ({ id, text, category, importance: 0.7, weight: 1, at: 日 + 'T00:00:00Z', createdAt: 日 + 'T00:00:00Z' })
   writeFileSync(join(库, 'session-x.json'), JSON.stringify({
     version: 2, purgeEpoch: 'ex', policy: {}, traces: [],
-    memories: [老('x-1', '主人喜欢大白饭', 'stable_profile'), 老('x-2', '主人养了一只猫', 'stable_profile'), 老('x-e', '一个事件', 'event')],
+    memories: [老('x-1', '用户喜欢大白饭', 'stable_profile'), 老('x-2', '用户养了一只猫', 'stable_profile'), 老('x-e', '一个事件', 'event')],
     deleted: [],
   }))
   writeFileSync(join(库, 'session-y.json'), JSON.stringify({
     version: 2, purgeEpoch: 'ey', policy: {}, traces: [],
     // 和 x-1 同一条事实（只有空白/大小写差异），但更晚、更重要 → 去重后更新的是 x-1 那份
-    memories: [{ ...老('y-1', '主人喜欢大白饭', 'stable_profile', '2026-09-20'), importance: 0.9 }, 老('y-e', '另一个事件', 'event')],
+    memories: [{ ...老('y-1', '用户喜欢大白饭', 'stable_profile', '2026-09-20'), importance: 0.9 }, 老('y-e', '另一个事件', 'event')],
     deleted: [],
   }))
   return 家

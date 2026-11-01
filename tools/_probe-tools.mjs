@@ -25,7 +25,7 @@ const ctx = {
 const sid = 'session-probe-0001'
 
 const 记 = makeRememberTool(ctx)
-const 结果 = await 记.execute({ text: '鲸鱼娘今天在验证拆层之后的工具链', importance: 0.5 }, { agent: { session: { id: sid } } })
+const 结果 = await 记.execute({ text: '小助手今天在验证拆层之后的工具链', importance: 0.5 }, { agent: { session: { id: sid } } })
 
 const 报错 = 线索.filter((m) => /is not defined|is not a function|Cannot read/.test(m))
 console.log('remember 结果:', JSON.stringify(结果).slice(0, 160))
@@ -43,7 +43,7 @@ if (报错.length) {
 const 忘 = makeForgetTool(ctx)
 const 找 = makeRecallTool(ctx)
 const r2 = await 忘.execute({}, { agent: { session: { id: sid } } }).catch((e) => ({ 抛错: String(e) }))
-const r3 = await 找.execute({ query: '鲸鱼娘' }, { agent: { session: { id: sid } } }).catch((e) => ({ 抛错: String(e) }))
+const r3 = await 找.execute({ query: '小助手' }, { agent: { session: { id: sid } } }).catch((e) => ({ 抛错: String(e) }))
 console.log('forget:', JSON.stringify(r2).slice(0, 120))
 console.log('recall:', JSON.stringify(r3).slice(0, 120))
 const 后报错 = 线索.filter((m) => /is not defined|is not a function/.test(m))

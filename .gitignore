@@ -16,7 +16,10 @@ tmp/
 .DS_Store
 Thumbs.db
 
-# 内部开发文档与基准数据（含本机信息，不进发布仓库）
-docs/
-tools/bench/S0-data-snapshot.tar
+# 基准数据（含真实记忆库快照与真实问句，不发布）
 tools/bench/S0-baseline.json
+tools/bench/S0-data-snapshot.tar
+tools/bench/queries.json
+
+# 开发文档（含本机路径与真实记忆样本，不发布）
+docs/

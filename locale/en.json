@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Clay Memory",
+    "description": "Long-term memory for DSH sessions that fades over time: every entry carries a date, repeated recalls keep it alive, unused ones fade out, and deleted ones wait in the recycle bin."
+  }
+}

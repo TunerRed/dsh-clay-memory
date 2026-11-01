@@ -1,0 +1,22 @@
+# 依赖
+node_modules/
+
+# 调试脚本与临时产物
+tmp/
+*.log
+
+# 备份 / 原子写留下的副本
+*.bak
+*.bak-*
+*.bak.*
+*.before-*
+*.tmp
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 内部开发文档与基准数据（含本机信息，不进发布仓库）
+docs/
+tools/bench/S0-data-snapshot.tar
+tools/bench/S0-baseline.json

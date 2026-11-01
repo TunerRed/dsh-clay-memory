@@ -15,8 +15,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Yuuyuko-uu/dsh-clay-memory.git"
+    "url": "git+https://github.com/TunerRed/dsh-clay-memory.git"
   },
+  "bugs": {
+    "url": "https://github.com/TunerRed/dsh-clay-memory/issues"
+  },
+  "homepage": "https://github.com/TunerRed/dsh-clay-memory#readme",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",

@@ -49,11 +49,11 @@
 在 DSH 里：**设置 → 插件 → 安装**，填下面这一行；或者命令行：
 
 ```
-github:Yuuyuko-uu/dsh-clay-memory
+github:TunerRed/dsh-clay-memory
 ```
 
 ```sh
-dsh plugin --profile web add github:Yuuyuko-uu/dsh-clay-memory
+dsh plugin --profile web add github:TunerRed/dsh-clay-memory
 ```
 
 （`--profile` 照你平时那个写：网页端一般 `web`，桌面端一般 `desktop`。）
@@ -114,7 +114,7 @@ $p = "把上面 BOM=True 那一行的路径粘到这里"
 
 ```bash
 dsh plugin --profile desktop remove dsh-clay-memory
-dsh plugin --profile desktop add github:Yuuyuko-uu/dsh-clay-memory
+dsh plugin --profile desktop add github:TunerRed/dsh-clay-memory
 ```
 
 > ⚠️ **必须先卸再装**：直接装可能拿到缓存里的旧副本，装完还是老的。

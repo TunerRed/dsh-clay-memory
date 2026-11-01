@@ -1,6 +1,6 @@
 {
   "name": "dsh-clay-memory",
-  "version": "1.8.54",
+  "version": "1.8.55",
   "description": "给 DSH 里的会话一份会淡忘的长期记忆，每条都带时间。",
   "icon": "icon.svg",
   "license": "MIT",

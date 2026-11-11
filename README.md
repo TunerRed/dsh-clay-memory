@@ -514,10 +514,14 @@ npm run build:client
 2. **`npm run check:client`** —— 校验仓库里的 `lib/client.js` 与 `src/` 的构建结果一致，
    防止「改了源码忘了打包」。
 3. **`npm run ui-check -- <端口> <DSH_HOME>`** —— 真浏览器把页面点一遍：
-   六个页签、高级页展开参数、会话详情展开记忆列表、记忆页点「改」。
+   六个页签、高级页展开参数、会话详情展开记忆列表、记忆页点「改」，
+   最后拦 `/list` 返回「一个会话都没有」，验一遍「空库引导卡」出不出来（不动真实数据）。
    它要活着的实例和 Chrome，所以不进 `npm test`，改页面后手动跑一次。
+   要验后端也真为空的那条链路，加 `--empty`：把 `<DSH_HOME>/clay-memory` 临时改名、
+   原地建个空目录跑一遍，跑完在 `finally` 里原样挪回（中途失败也会挪回）。
 
 ```bash
 node tools/build-client.mjs
 node tools/ui-check.mjs 61021 G:/tmp/home/.dsh
+node tools/ui-check.mjs 61021 G:/tmp/home/.dsh --empty   # 顺带验真空库
 ```

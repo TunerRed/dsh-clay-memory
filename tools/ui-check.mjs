@@ -8,7 +8,7 @@
 // 为什么手动跑、不进单元测试：它要一个活着的实例、要 Chrome、要本地登录凭证；
 // 放进 `npm test` 会让 CI 和没装浏览器的机器全挂。改动页面之后手动跑一次就够。
 //
-// 覆盖：五个页签 → 高级页展开「参数」→ 会话详情展开「记忆列表」→ 记忆页点「改」（层级选择器）。
+// 覆盖：六个页签 → 高级页展开「参数」→ 会话详情展开「记忆列表」→ 记忆页点「改」（层级选择器）。
 // 任何一处出现 `is not defined`、`出了点问题`、控制台报错，都算失败（退出码 1）。
 import { createRequire } from 'node:module'
 import { createHash, createHmac } from 'node:crypto'
@@ -59,7 +59,7 @@ const 判 = (好, 说明) => {
 }
 
 // ① 五个页签
-for (const 名 of ['记忆', '会话', '回收站', '体检', '高级']) {
+for (const 名 of ['记忆', '时间线', '会话', '回收站', '体检', '高级']) {
   await 页.getByRole('tab', { name: 名, exact: true }).click()
   await 页.waitForTimeout(名 === '会话' ? 6000 : 1800)
   const 文本 = await 面板.innerText()

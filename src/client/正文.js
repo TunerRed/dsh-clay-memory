@@ -2,6 +2,7 @@ import { 造记忆面板 } from './pages/panel.js'
 import { 造会话页 } from './pages/sessions.js'
 import { 造所有记忆页 } from './pages/memories.js'
 import { 造高级区 } from './pages/advanced.js'
+import { 造时间线页 } from './pages/timeline.js'
 import { 造回收站页 } from './pages/recycle.js'
 import { 造回复体检页 } from './pages/checkup.js'
 
@@ -622,6 +623,7 @@ const 洗键进度 = { 已: 0, 总: 0, 在跑: false, 干跑: false }
     //   高级里的「去调」= 切到「会话」页并展开参数，不再来回跳页面。
     const 页签名 = [
       ['记忆', '所有记忆'],
+      ['时间线', '按天看：那天记了什么 · 又想起过什么'],
       ['会话', '每个会话的开关 · 称呼 · 导入 · 提炼'],
       ['回收站', '删掉的记忆都在这儿 · 能搜能找回'],
       ['体检', '助手回复的 AI 味 · 规则开关'],
@@ -670,6 +672,7 @@ const 洗键进度 = { 已: 0, 总: 0, 在跑: false, 干跑: false }
     // ⭐ 2026-11-01 用户：「回收站的条目好多，是会话和工作区共用的吗？如果是，能不能换到顶部页签
     //   做成一个独立的内容？顺便把搜索也做上，只搜内容就行了」→ 顶部独立「回收站」页签。
     //   回收站不共用：事实库/每个会话/每个工作区各自一个 deleted 数组，这里合起来看、标来源、能找回。
+  const 时间线页 = 造时间线页({ React, el, get, S, G, 类型名 })
   const 回收站页 = 造回收站页({ React, get, post, S, el, 类型名 })
 
     // ⭐ 2026-11-10：回复体检（FuckAIWords 的 22 类词面规则，从 dsh-persona-growth 搬进黏土记忆）
@@ -681,7 +684,7 @@ const 洗键进度 = { 已: 0, 总: 0, 在跑: false, 干跑: false }
   // ⚠ 会话页里也用到组件外的进度对象（切走再回来还在）：漏传会 `ReferenceError: 进度 is not defined`，整页空白
   const { 会话页 } = 造会话页({ React, el, get, post, B, S, rel, impName, 一次最多画, 进度, 改进度, 补标进度, 洗键进度 })
 
-  const { 记忆面板 } = 造记忆面板({ React, el, get, post, S, G, B, rel, impName, toPct, fromPct, 进度, 更新条, 类型名, 类型表, 同日, 归整, 一次最多画, 重要色, 会话页, 所有记忆页, 回收站页, 回复体检页, 高级区 , 页签名, 兜底})
+  const { 记忆面板 } = 造记忆面板({ React, el, get, post, S, G, B, rel, impName, toPct, fromPct, 进度, 更新条, 类型名, 类型表, 同日, 归整, 一次最多画, 重要色, 会话页, 所有记忆页, 时间线页, 回收站页, 回复体检页, 高级区 , 页签名, 兜底})
     function apply(ctx) {
       const slots = ctx.get('slots')
       if (slots === undefined) return

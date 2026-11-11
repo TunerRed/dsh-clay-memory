@@ -1,6 +1,6 @@
 // 记忆面板 —— 2026-11-11 从 lib/client.js 拆出来（逻辑未改）
 // 依赖由正文注入；模块内部自成一体。
-export function 造记忆面板({ React, el, get, post, S, G, B, rel, impName, toPct, fromPct, 进度, 更新条, 类型名, 类型表, 同日, 归整, 一次最多画, 重要色, 会话页, 所有记忆页, 回收站页, 回复体检页, 高级区, 页签名, 兜底}) {
+export function 造记忆面板({ React, el, get, post, S, G, B, rel, impName, toPct, fromPct, 进度, 更新条, 类型名, 类型表, 同日, 归整, 一次最多画, 重要色, 会话页, 所有记忆页, 时间线页, 回收站页, 回复体检页, 高级区, 页签名, 兜底}) {
       function 记忆面板() {
         const [页签, set页签] = React.useState('记忆')
   
@@ -43,6 +43,7 @@ export function 造记忆面板({ React, el, get, post, S, G, B, rel, impName, t
   
         let 内容 = null
         if (页签 === '记忆') 内容 = el(所有记忆页, { on高级: () => set页签('高级') })
+        else if (页签 === '时间线') 内容 = el(时间线页, null)
         else if (页签 === '会话')
           内容 = el(会话页, null)
   

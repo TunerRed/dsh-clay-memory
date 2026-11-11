@@ -1,0 +1,32 @@
+# 依赖
+node_modules/
+
+# 调试脚本与临时产物
+tmp/
+*.log
+
+# 备份 / 原子写留下的副本
+*.bak
+*.bak-*
+*.bak.*
+*.before-*
+*.tmp
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 基准数据（含真实记忆库快照与真实问句，不发布）
+tools/bench/S0-baseline.json
+tools/bench/S0-data-snapshot.tar
+tools/bench/queries.json
+
+# 开发文档（含本机路径与真实记忆样本，不发布）
+docs/
+
+# 本机骨架数据（含主人私有画像，不发布）
+_core.json
+
+# 临时探测脚本
+_probe_traces.mjs
+_tmp-testhome/

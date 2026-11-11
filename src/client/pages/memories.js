@@ -30,7 +30,45 @@ export function 造所有记忆页({ React, el, get, post, B, S, G, rel, 类型�
         // ⭐ 1.11.0 一期（§4.8）：候选区 —— 钩子挑出来的「像该记的话」，采纳了才进正式记忆
         const [候选们, set候选们] = React.useState(null)
         const [候选开, set候选开] = React.useState(false)
+        // ⭐ F20（1.12.13）：整理（查重合并 / 洗键）原来散在会话详情里，现在搬到这一页，一次看全部会话
+        const [整理跑, set整理跑] = React.useState(false)
+        const [整理话, set整理话] = React.useState('')
+        const [查重结果, set查重结果] = React.useState(null)
   
+        const 查重 = async () => {
+          set整理跑(true)
+          set整理话('正在跟全部会话比……')
+          try {
+            const r = await get('/duplicates-all')
+            if (!r || r.ok === false) set整理话('查重失败：' + ((r && r.message) || '？'))
+            else {
+              set查重结果(r)
+              set整理话(r.总组 ? '找到 ' + r.总组 + ' 组完全重复，合并能少 ' + r.能少 + ' 条（留着的那条不动）' : '没有完全重复的条目')
+            }
+          } catch (e) {
+            set整理话('查重出错：' + String((e && e.message) || e))
+          }
+          set整理跑(false)
+        }
+        const 合并全部 = async () => {
+          if (!查重结果 || !Array.isArray(查重结果.会话)) return
+          set整理跑(true)
+          set整理话('正在合并……')
+          let 收 = 0
+          let 保 = 0
+          for (const x of 查重结果.会话) {
+            try {
+              const r = await post('/duplicates/merge', { session: x.session, 组: x.组 })
+              if (r && r.ok !== false) 收 += Number(r.收起来) || 0
+              保 += Number(r && r.保住) || 0
+            } catch (e) {
+              保 += 1
+            }
+          }
+          set整理话('合掉了 ' + 收 + ' 条' + (保 ? '，另有 ' + 保 + ' 条不够像、保住了' : '') + '。收在「已删」里，能找回来。')
+          set整理跑(false)
+          set查重结果(null)
+        }
         // ⭐ 1.7.3：这一页有两个「看哪些记忆」的入口 ——
         //   作用域=全部/全局记忆 → 用 /all（去重后的一份，跨会话不重复）
         //   作用域=指定会话     → 用 /all?session=<那个会话>（它自己的视图，含 copy-to 出来的副本）
@@ -575,6 +613,34 @@ export function 造所有记忆页({ React, el, get, post, B, S, G, rel, 类型�
                 段.join(' · '),
               )
             })(),
+            // ⭐ F20（1.12.13）：整理 —— 查重合并，一次看全部会话（原来只能一个会话一个会话点进去）
+            el(
+              'div',
+              { style: { marginTop: 10, border: '1px solid rgba(128,128,128,.22)', borderRadius: 8, padding: '8px 10px', fontSize: 12.5 } },
+              el(
+                'div',
+                { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                el('span', { style: { fontWeight: 600 } }, '整理'),
+                el('span', { style: { opacity: 0.6 } }, '查重合并 · 一次看全部会话'),
+                el('button', { style: S.btn, disabled: 整理跑, onClick: () => 查重() }, '查重'),
+                el('button', { style: S.btnOn, disabled: 整理跑, onClick: () => 合并全部() }, '合并全部真重复'),
+              ),
+              整理话 ? el('div', { style: { marginTop: 6, opacity: 0.8 } }, 整理话) : null,
+              查重结果 && 查重结果.会话 && 查重结果.会话.length
+                ? el(
+                    'div',
+                    { style: { marginTop: 6, opacity: 0.82, maxHeight: 160, overflow: 'auto' } },
+                    ...查重结果.会话.slice(0, 12).map((x) =>
+                      el(
+                        'div',
+                        { key: x.session, style: { marginTop: 3 } },
+                        el('span', { style: { fontWeight: 600 } }, String(x.名称 || x.session)),
+                        el('span', { style: { opacity: 0.65 } }, ' · ' + x.组.length + ' 组 · 能少 ' + x.能少 + ' 条'),
+                      ),
+                    ),
+                  )
+                : null,
+            ),
             // ⭐ 1.11.0 一期（§4.8）：候选区 —— 钩子只标候选，这里由人决定「记下 / 不管」
             (() => {
               const 数 = 候选们 && typeof 候选们.count === 'number' ? 候选们.count : 0

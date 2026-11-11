@@ -50,6 +50,36 @@ export function 造所有记忆页({ React, el, get, post, B, S, G, rel, 类型�
           }
           set整理跑(false)
         }
+        // ⭐ 1.12.15：补键（洗键）也搬到这一页 —— 以前藏在会话详情里，N 洗完变 0 按钮消失就再也找不到
+        const [补键结果, set补键结果] = React.useState(null)
+        const 查补键 = async () => {
+          set整理跑(true)
+          set整理话('正在数还剩多少条没标……')
+          try {
+            const r = await get('/wash-plan')
+            if (!r || r.ok === false) set整理话('补键读不出来：' + ((r && r.message) || '？'))
+            else {
+              set补键结果(r)
+              set整理话(r.总剩 ? '还有 ' + r.总剩 + ' 条没标「这件事叫什么」（' + r.会话.length + ' 个会话）' : '都标过了：库里 ' + r.带键 + ' 条带键，没有要补的')
+            }
+          } catch (e) {
+            set整理话('补键出错：' + String((e && e.message) || e))
+          }
+          set整理跑(false)
+        }
+        const 洗一批 = async (sid) => {
+          set整理跑(true)
+          set整理话('正在让模型给一批补键……（会调模型，按量计费）')
+          try {
+            const r = await post('/wash-keys', { session: sid, 每批: 20 })
+            if (!r || r.ok === false) set整理话('补键失败：' + ((r && r.message) || '？'))
+            else set整理话('这批给键 ' + (Number(r.给了键) || 0) + ' 条、留空 ' + (Number(r.留空) || 0) + ' 条，还剩 ' + (Number(r.剩) || 0) + ' 条')
+          } catch (e) {
+            set整理话('补键出错：' + String((e && e.message) || e))
+          }
+          set整理跑(false)
+          await 查补键()
+        }
         const 合并全部 = async () => {
           if (!查重结果 || !Array.isArray(查重结果.会话)) return
           set整理跑(true)
@@ -621,11 +651,27 @@ export function 造所有记忆页({ React, el, get, post, B, S, G, rel, 类型�
                 'div',
                 { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
                 el('span', { style: { fontWeight: 600 } }, '整理'),
-                el('span', { style: { opacity: 0.6 } }, '查重合并 · 一次看全部会话'),
+                el('span', { style: { opacity: 0.6 } }, '查重合并 · 补键 · 一次看全部会话'),
                 el('button', { style: S.btn, disabled: 整理跑, onClick: () => 查重() }, '查重'),
                 el('button', { style: S.btnOn, disabled: 整理跑, onClick: () => 合并全部() }, '合并全部真重复'),
+                el('button', { style: S.btn, disabled: 整理跑, onClick: () => 查补键() }, '补键'),
               ),
               整理话 ? el('div', { style: { marginTop: 6, opacity: 0.8 } }, 整理话) : null,
+              补键结果 && 补键结果.会话 && 补键结果.会话.length
+                ? el(
+                    'div',
+                    { style: { marginTop: 6, opacity: 0.82, maxHeight: 160, overflow: 'auto' } },
+                    ...补键结果.会话.slice(0, 12).map((x) =>
+                      el(
+                        'div',
+                        { key: x.session, style: { marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 } },
+                        el('span', { style: { fontWeight: 600 } }, String(x.名称 || x.session)),
+                        el('span', { style: { opacity: 0.65 } }, ' · 剩 ' + x.剩 + ' 条'),
+                        el('button', { style: S.btn, disabled: 整理跑, onClick: () => 洗一批(x.session) }, '洗一批'),
+                      ),
+                    ),
+                  )
+                : null,
               查重结果 && 查重结果.会话 && 查重结果.会话.length
                 ? el(
                     'div',

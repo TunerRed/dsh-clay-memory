@@ -102,3 +102,30 @@ test('知识条目不吃免门名额', () => {
   assert.match(out, /TypeScript/, '唯一的名额给画像第一条')
   assert.doesNotMatch(out, /泰拉瑞亚/, '第二条画像不该因为名额被知识占掉而一起进')
 })
+
+// ⭐ 1.12.23（F10 阶段 0 第三）：知识退出常驻（knowledgeStaysOut）
+const 知识与画像 = [
+  {
+    id: 'k1',
+    category: 'stable_profile',
+    importance: 1,
+    is_knowledge: true,
+    text: 'Kafka 消息队列部署在 9092 端口，日志目录是 /var/log/kafka',
+  },
+  { id: 'p1', category: 'stable_profile', importance: 1, text: '主人是程序员，主要写 TypeScript' },
+]
+
+test('knowledgeStaysOut=0（默认）：知识条目照旧能进常驻层', () => {
+  const sid = 'kso-off'
+  seed(sid, 知识与画像, { knowledgeStaysOut: 0 })
+  const out = 注入文本(sid, 'Kafka 端口是多少')
+  assert.match(out, /Kafka/, '默认不隔离知识，命中了就该进')
+})
+
+test('knowledgeStaysOut=1：知识不占常驻名额，画像的免门不受影响', () => {
+  const sid = 'kso-on'
+  seed(sid, 知识与画像, { knowledgeStaysOut: 1, factsAlwaysTopN: 2 })
+  const out = 注入文本(sid, 'Kafka 端口是多少')
+  assert.doesNotMatch(out, /9092/, '知识不该再无条件占常驻位')
+  assert.match(out, /TypeScript/, '画像的免证据名额照旧生效')
+})

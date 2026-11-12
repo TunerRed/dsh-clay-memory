@@ -78,3 +78,27 @@ test('免门名额也受 factsMax 限制', () => {
   assert.match(out, /TypeScript/, '第一条进')
   assert.doesNotMatch(out, /泰拉瑞亚/, 'factsMax=1 只肯放一条')
 })
+
+// 1.12.21：免门只给画像 —— 知识条目（is_knowledge: true）永远要证据
+const 带知识 = [
+  { id: 'k1', category: 'stable_profile', importance: 1, is_knowledge: true, text: '生产环境 nginx 限流写在 conf.d/limit.conf' },
+  ...两条,
+]
+
+test('知识条目不因免门被放行（哪怕它排最前）', () => {
+  const sid = 'always-knowledge'
+  seed(sid, 带知识, { factsAlwaysTopN: 2 })
+  const out = 注入文本(sid, '今天天气怎么样')
+  assert.doesNotMatch(out, /nginx/, '知识条目没有证据就不能进，即使 importance=1')
+  assert.match(out, /TypeScript/, '画像照常免门')
+  assert.match(out, /泰拉瑞亚/, '画像照常免门')
+})
+
+test('知识条目不吃免门名额', () => {
+  const sid = 'always-knowledge-slot'
+  seed(sid, 带知识, { factsAlwaysTopN: 1 })
+  const out = 注入文本(sid, '今天天气怎么样')
+  assert.doesNotMatch(out, /nginx/, '知识不进')
+  assert.match(out, /TypeScript/, '唯一的名额给画像第一条')
+  assert.doesNotMatch(out, /泰拉瑞亚/, '第二条画像不该因为名额被知识占掉而一起进')
+})

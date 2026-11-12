@@ -20,6 +20,7 @@ export function 造高级区({ React, el, get, post, S, G, toPct, fromPct, 进�
         const [notes, setNotes] = React.useState(null)
         const [busy, setBusy] = React.useState(false)
         const [开, set开] = React.useState(false) // ⭐ 默认收起（调一次就不动，不占地方）
+        const [均长, set均长] = React.useState(0) // ⭐ F10 阶段 0（1.12.25）：当前库平均条长，用来算名额×字长的联动
         const load = React.useCallback(() => {
           get('/list')
             .then((x) => {
@@ -28,6 +29,9 @@ export function 造高级区({ React, el, get, post, S, G, toPct, fromPct, 进�
               setNotes(null)
             })
             .catch((e) => setNotes(['读不到参数：' + String((e && e.message) || e)]))
+          get('/health?days=7')
+            .then((h) => set均长(Number(h && h.汇总 && h.汇总.平均字数) || 0))
+            .catch(() => {})
         }, [])
         React.useEffect(() => {
           load()
@@ -79,10 +83,35 @@ export function 造高级区({ React, el, get, post, S, G, toPct, fromPct, 进�
           ]
           if (unit) head.push(el('span', { key: 'unit', style: Object.assign({}, S.dim, { fontSize: 12 }) }, unit))
           head.push(el('span', { key: 'rng', style: Object.assign({}, S.dim, { fontSize: 11, opacity: 0.7 }) }, '（' + lo + ' ~ ' + hi + '）'))
+          // ⭐ F10 阶段 0（1.12.25）：名额 × 字长的联动 —— 光看数字看不出「6 条 × 176 字 > 800 预算」
+          const 估 = (() => {
+            const 均 = Number(均长) || 0
+            const 预算 = Number(params.maxChars) || 0
+            if (!均 || !预算) return null
+            if (s.key === 'factsMax' && Number(cur) > 0) {
+              const 名义 = Math.round(均 * Number(cur))
+              if (名义 > 预算) {
+                const 能进 = Math.min(Number(cur), Math.floor(预算 / 均))
+                return { 超: true, text: '按当前库均长 ' + 均 + ' 字算：' + cur + ' 条 × ' + 均 + ' 字 = ' + 名义 + ' 字，超出 ' + 预算 + ' 字预算，实际大约只能进 ' + 能进 + ' 条' }
+              }
+              return { 超: false, text: '按当前库均长 ' + 均 + ' 字算：' + cur + ' 条 × ' + 均 + ' 字 = ' + 名义 + ' 字，' + 预算 + ' 字预算装得下' }
+            }
+            if (s.key === 'maxChars' && Number(cur) > 0) {
+              return { 超: false, text: '按当前库均长 ' + 均 + ' 字算：这个预算大约装得下 ' + Math.floor(Number(cur) / 均) + ' 条（名额 ' + (Number(params.factsMax) || 0) + ' 条）' }
+            }
+            return null
+          })()
           return el(
             'div',
             { key: s.key, style: { margin: '5px 0' } },
             el('div', { style: { display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' } }, head),
+            估
+              ? el(
+                  'div',
+                  { style: Object.assign({}, S.dim, { fontSize: 11, marginTop: 1, lineHeight: 1.45 }, 估.超 ? { color: '#c2410c', opacity: 0.95 } : { opacity: 0.75 }) },
+                  估.text,
+                )
+              : null,
             s.tip
               ? el('div', { style: Object.assign({}, S.dim, { fontSize: 11, marginTop: 1, lineHeight: 1.45, opacity: 0.85 }) }, s.tip)
               : null,

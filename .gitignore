@@ -21,8 +21,9 @@ tools/bench/S0-baseline.json
 tools/bench/S0-data-snapshot.tar
 tools/bench/queries.json
 
-# 开发文档（含本机路径与真实记忆样本，不发布）
-docs/
+# 开发文档里没脱敏的那两份（真实记忆条目 id / 真实问句，不发布）
+# 其余设计文档已进 git
+docs/private/
 
 # 本机骨架数据（含主人私有画像，不发布）
 _core.json

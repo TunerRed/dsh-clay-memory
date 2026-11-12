@@ -634,6 +634,13 @@ export function 造所有记忆页({ React, el, get, post, B, S, G, rel, 类型�
               if (配.maxItems || 配.maxChars) {
                 段.push('配额 ' + (配.maxItems || 0) + ' 条 / ' + (配.maxChars || 0) + ' 字')
               }
+              // ⭐ F10 阶段 0（1.12.24）：预算吃紧可见 —— 看不到「吃了多少 / 裁了几条」就没法判断该不该调参
+              if (typeof 汇.预算利用率 === 'number') {
+                段.push('预算吃 ' + 汇.预算利用率 + '%')
+              }
+              if (汇.被裁条数) {
+                段.push('被裁 ' + 汇.被裁条数 + ' 条（' + 汇.裁剪率 + '%）')
+              }
               return el(
                 'div',
                 {

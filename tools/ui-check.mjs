@@ -157,6 +157,42 @@ try {
     const 参数文本 = await 面板.innerText()
     判(/权重/u.test(参数文本) && /遗忘速度/u.test(参数文本), '高级 · 参数区（权重 / 遗忘速度）')
 
+    // ②b 骨架预览 → 进编辑态 → 「＋ 加一条」出现输入框 → 取消（不写盘）
+    //     ⭐ 1.12.22：骨架预览从「只看差异」改成「能就地改」，这条守着编辑入口没被拆坏
+    const 骨架态 = await 页.evaluate(() => {
+      const 框 = document.querySelector('[role="dialog"]')
+      if (!框) return 'no-dialog'
+      const 钮 = [...框.querySelectorAll('button')].find((e) => /^编辑骨架/u.test((e.innerText || '').trim()))
+      if (!钮) return 'no-button'
+      钮.click()
+      return 'ok'
+    })
+    let 编辑成立 = false
+    if (骨架态 === 'ok') {
+      await 页.waitForTimeout(900)
+      编辑成立 = await 页.evaluate(() => {
+        const 框 = document.querySelector('[role="dialog"]')
+        const 加 = [...框.querySelectorAll('button')].find((e) => (e.innerText || '').trim() === '＋ 加一条')
+        if (!加) return false
+        加.click()
+        return true
+      })
+      if (编辑成立) {
+        await 页.waitForTimeout(700)
+        编辑成立 = await 页.evaluate(() => {
+          const 框 = document.querySelector('[role="dialog"]')
+          return !!(框 && 框.querySelector('textarea'))
+        })
+        await 页.evaluate(() => {
+          const 框 = document.querySelector('[role="dialog"]')
+          const 取 = [...框.querySelectorAll('button')].find((e) => (e.innerText || '').trim() === '取消')
+          if (取) 取.click()
+        })
+        await 页.waitForTimeout(400)
+      }
+    }
+    判(编辑成立, '高级 · 骨架预览可编辑（编辑态 + 加一条）')
+
     // ③ 会话详情 → 记忆列表
     await 页.getByRole('tab', { name: '会话', exact: true }).click()
     await 页.waitForTimeout(6000)

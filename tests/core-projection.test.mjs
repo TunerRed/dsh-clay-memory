@@ -13,7 +13,7 @@ process.env.DSH_HOME = 家
 const 库目录 = join(家, 'clay-memory')
 mkdirSync(库目录, { recursive: true })
 
-const { 骨架候选, 比对骨架, 并入骨架 } = await import('../lib/core-projection.mjs')
+const { 骨架候选, 比对骨架, 并入骨架, 规范骨架 } = await import('../lib/core-projection.mjs')
 const { 注册管理路由 } = await import('../lib/routes-admin.mjs')
 
 const 库 = (memories) => ({ version: 2, purgeEpoch: '', policy: {}, memories, deleted: [], traces: [] })
@@ -109,4 +109,51 @@ test('路由：GET 只算不写；POST apply 才写，且留 .bak', async () => 
   const 后 = JSON.parse(readFileSync(骨架路径, 'utf8'))
   assert.deepStrictEqual(后.items.map((x) => x.content), ['她是鲸鱼娘', '主人喜欢大白饭'])
   assert.ok(existsSync(骨架路径 + '.bak'))
+})
+
+// ⭐ 1.12.22：预览页手改后整份覆盖 —— 规范骨架（纯函数）
+test('规范骨架：空内容 = 删掉这条，其余保留', () => {
+  const r = 规范骨架(
+    [
+      { id: 'a', content: '主人喜欢大白饭', core: true },
+      { id: 'b', content: '   ' },
+      { id: 'c', content: '主人在攒钱' },
+    ],
+    [],
+    1000,
+  )
+  assert.strictEqual(r.ok, true)
+  assert.deepStrictEqual(r.items.map((x) => x.content), ['主人喜欢大白饭', '主人在攒钱'])
+  assert.strictEqual(r.items[0].core, true)
+  assert.strictEqual(r.items[1].core, false)
+})
+
+test('规范骨架：单条超 400 字直接拒绝', () => {
+  const 长 = '字'.repeat(401)
+  const r = 规范骨架([{ content: 长 }], [], 1000)
+  assert.strictEqual(r.ok, false)
+  assert.match(r.message, /400/)
+})
+
+test('规范骨架：带原 id 的沿用原条目字段，没 id 的补一个新 id', () => {
+  const 原 = [{ id: 'core-portrait', content: '旧文本', subject: 'user', category: 'core_portrait', core: true }]
+  const r = 规范骨架(
+    [
+      { id: 'core-portrait', content: '新文本', core: true },
+      { id: '', content: '手写的一条' },
+    ],
+    原,
+    1000,
+  )
+  assert.strictEqual(r.ok, true)
+  assert.strictEqual(r.items[0].id, 'core-portrait')
+  assert.strictEqual(r.items[0].subject, 'user')
+  assert.strictEqual(r.items[0].category, 'core_portrait')
+  assert.strictEqual(r.items[0].content, '新文本')
+  assert.match(r.items[1].id, /^core-manual-/)
+})
+
+test('规范骨架：非数组直接拒绝', () => {
+  const r = 规范骨架('不是数组', [], 1000)
+  assert.strictEqual(r.ok, false)
 })

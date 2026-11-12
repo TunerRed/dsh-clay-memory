@@ -157,3 +157,15 @@ test('规范骨架：非数组直接拒绝', () => {
   const r = 规范骨架('不是数组', [], 1000)
   assert.strictEqual(r.ok, false)
 })
+
+// ⭐ F10 阶段 0（1.12.26）：骨架候选要带 is_knowledge —— 路由靠它把「技术笔记」排除在提醒之外
+test('骨架候选：带 is_knowledge 标记，知识条目不冒充画像', () => {
+  const 条 = [
+    { id: 'a', text: '主人叫许澄', category: 'stable_profile', importance: 1, is_knowledge: false },
+    { id: 'b', text: 'Nginx 反代要开 proxy_set_header', category: 'stable_profile', importance: 1, is_knowledge: true },
+  ]
+  const 候选 = 骨架候选(条)
+  assert.strictEqual(候选.length, 2)
+  assert.strictEqual(候选[0].is_knowledge, false)
+  assert.strictEqual(候选[1].is_knowledge, true)
+})

@@ -1072,6 +1072,8 @@ export function 造高级区({ React, el, get, post, S, G, toPct, fromPct, 进�
         // ⭐ 1.12.22：骨架可手改 —— null = 不在编辑；数组 = 正在编（保存时整份覆盖）
         const [骨架草, set骨架草] = React.useState(null)
         const [骨架存跑, set骨架存跑] = React.useState(false)
+        // ⭐ F10 阶段 0（1.12.26）：骨架空但主库有够格条目 → 顶上挂一条提醒
+        const [骨提示, set骨提示] = React.useState(null)
         React.useEffect(() => {
           get('/list')
             .then((l) => {
@@ -1101,7 +1103,10 @@ export function 造高级区({ React, el, get, post, S, G, toPct, fromPct, 进�
         const 拉骨架预 = () => {
           get('/core-preview')
             .then((r) => {
-              if (r && r.ok !== false) set骨架预(r)
+              if (r && r.ok !== false) {
+                set骨架预(r)
+                set骨提示((r && r.提示) || null)
+              }
             })
             .catch(() => {})
         }
@@ -1357,6 +1362,34 @@ export function 造高级区({ React, el, get, post, S, G, toPct, fromPct, 进�
           // ── 参数（2026-11-01 用户要求：从「会话 → 参数」整块搬来，替代原来的「记忆习惯」三档；
           //   样式沿用原来的折叠卡——默认收起，点标题才展开）
           el(参数区, null),
+          // ⭐ F10 阶段 0（1.12.26）：骨架还空着，但主库已经攒够格的了 —— 顶上挂一条，别让人自己去猜
+          骨提示
+            ? el(
+                'div',
+                {
+                  style: {
+                    margin: '0 0 10px',
+                    padding: '8px 10px',
+                    border: '1px solid rgba(194,65,12,.35)',
+                    background: 'rgba(249,115,22,.07)',
+                    borderRadius: 8,
+                    fontSize: 12.5,
+                    lineHeight: 1.6,
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  },
+                },
+                el(
+                  'span',
+                  { style: { flex: '1 1 320px' } },
+                  '有 ' +
+                    骨提示.够格 +
+                    ' 条记忆够格进骨架（重要度 ≥0.8），但骨架现在是空的。骨架每轮都在场上，适合放「她是谁 / 怎么称呼 / 别做什么」这种长期不变的东西 —— 下面「骨架预览」里能挑几条进去。',
+                ),
+              )
+            : null,
           // ── 骨架预览（1.12.0）
           //   骨架 _core.json 每轮都在场上，但它一直是手写的、跟主库脱节。
           //   这里把它当「主库的投影」：只算差在哪（该加的 / 主库已经不认的），

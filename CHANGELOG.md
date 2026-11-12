@@ -1,3 +1,17 @@
+## 1.12.18 — 2026-11-12
+
+**F9 惰性衰减收尾：活跃度结算只剩一份公式，写路径行为一个字没变**
+
+F9 要的是「lazy decay：只存 (激活度, 上次结算时刻)，用的时候才按 now 算」。这套主体 1.10.3 就在跑了，但公式散成两份：读路径 `scoring.mjs` 的 `鲜活度()`，写路径 `tools.mjs` 里 remember 强化时手抄的一份（还多两条特判：长期事实恒 1、没 at 又没锚取常数）。两份已经漂了 —— 注释写着「必须和 evaluate 用同一套规则」，实现却各写各的。
+
+- `lib/scoring.mjs` 抽出 `结算活跃度(m, policy, now, 选项)`：`H = baseHalfLifeDays × (1 + 2×importance)`，锚点优先 `activationAnchor → at → createdAt → importAt`，长期事实取 `unknownActivation` 常数；`鲜活度()` 变成它的薄包装（读路径一个参数不变）。
+- 两个「有意差异」改用选项表达，不合并：`{ 稳定值: 1, 只认显式锚: true }` —— 长期事实在写路径固定 1（从半路往上补很怪），且只认 `at` / `activationAnchor`、不拿 `createdAt` 兜底（没记时间的老条目按常数算）。`tools.mjs` 的强化分支改成 `结算活跃度(m, policy, now, 选项)`，顺手删掉手抄的 `I0/H0/旧锚/旧A0`。
+- **行为零变化，不是「零可测变化」**：把真库（`G:\DSH_HOME\clay-memory` 只读副本，71 个会话文件、621 条记忆）逐条喂给新旧两份实现比对 —— 差异 0 条，最大差 0。中途试过直接统一到读路径语义，结果 495/621 条（79.71%）数值变化、`stable_profile` 最大差 0.5，所以没收口，改成参数化。
+- 新增 `tests/decay.test.mjs` 12 例：刚记下≈1 / 一个半衰期减半 / importance 抬 H / 锚优先级 / 无 at 有 createdAt / 长期事实取常数 / 全无时间不 NaN / 回血 0.5→0.6 且锚挪动 / 回血后 30 天回到 0.3 / 写路径两选项（长期事实固定 1、只有 createdAt 取常数）/ 有 at 时读写同值。
+- 半衰期（默认 30 天，15–60）、回血系数（0.2）、`unknownActivation`（默认 1）**一个都没动**。
+
+验证：`node --test tests/decay.test.mjs` 12/12 过；全量 `node --test tests/*.test.mjs` 375 过 1 跳过 0 失败（51 个文件、376 用例）。
+
 ## 1.12.17 — 2026-11-12
 
 **自检摘要按轮去重：一条消息多个 step，不再连着喊同一句**

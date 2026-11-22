@@ -23,7 +23,13 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      # 插件零运行时依赖（只用 Node 内置模块），所以没有 npm ci 这一步。
+      # 要 npm ci：check:client 会调 esbuild 重新构建页面，esbuild 是 devDependency，
+      # 不装就在 CI 上直接炸 ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'。
+      # 插件运行时确实零依赖（lib/ 只用 Node 内置模块），但工具链不是——这两件事别混。
+      # 也不能加 --ignore-scripts：esbuild 靠 install 脚本落平台二进制（@esbuild/win32-x64）。
+      - name: 装依赖（npm ci）
+        shell: bash
+        run: npm ci
       # 注意：必须用 npm test，直接 node --test tests/ 会多挂 1 条（glob 展开差异）。
       - name: 测试（npm test）
         shell: bash

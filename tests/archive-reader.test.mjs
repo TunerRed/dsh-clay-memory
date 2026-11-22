@@ -43,14 +43,25 @@ test('单帧：能解出来', () => {
 
 test('多帧：三帧全解、顺序不乱（这就是 Node 自带 API 会吞掉的那部分）', () => {
   const buf = Buffer.concat([压(会话头), 压(用户), 压(助手)])
-  // 前提确认：一次调用只能拿到第一帧 —— 这正是必须自己切的原因
-  const 一次 = zstdDecompressSync(buf).toString('utf8')
-  assert.ok(一次.length < buf.length, '一次解压拿不到全部，说明确实是多帧')
+  // ⭐ 1.12.88：这里原来硬断言「一次调用只能拿到第一帧」，CI 上直接红了 ——
+  //   不同 Node 小版本的 `zstdDecompressSync` 对**多帧串联**的处理不一致：
+  //   本机 24.13 只解第一帧，GitHub Actions 的 24.22 会连环解完。
+  //   所以「宿主一定只解第一帧」不能当事实断言，只能当**环境记录**。
+  //   我们真正要保证的是：不管宿主怎么解，`解压归档` 都得拿全三帧、顺序不乱。
+  let 宿主一次 = ''
+  try {
+    宿主一次 = zstdDecompressSync(buf).toString('utf8')
+  } catch {
+    宿主一次 = ''
+  }
+  const 宿主全解 = 宿主一次.includes('记住了')
   const r = 解压归档(buf)
   assert.equal(r.帧数, 3)
   assert.equal(r.跳过, 0)
   assert.ok(r.文本.indexOf('session') < r.文本.indexOf('大白饭'))
   assert.ok(r.文本.indexOf('大白饭') < r.文本.indexOf('记住了'))
+  // 宿主要是一次能全解，说明这条路上我们的切帧不能比它少内容
+  if (宿主全解) assert.ok(r.文本.includes('记住了'), '宿主一次能全解，我们也要解全')
 })
 
 test('假 magic 干扰：插在两帧之间的假帧头不会让后面的帧丢', () => {

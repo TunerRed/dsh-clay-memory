@@ -1,6 +1,22 @@
 // 所有记忆页 —— 2026-11-11 从 lib/client.js 拆出来（逻辑未改）
 // 依赖由正文注入；模块内部自成一体。
 import { 造选择器 } from '../components/select.js'
+
+// ⭐ 1.12.88：`source` 里混着几个内部标识符（英文），直接显示太生硬。
+//   只翻译认得的；不认得的原样返回 —— 宁可露出原文，也不要编一个听着像回事的名字。
+const 出处表 = {
+  'episode-extract': '经历提取',
+  自动抽取: '自动抽取',
+  手动添加: '手动添加',
+  她自己记的: '她自己记的',
+  她改过的: '她改过的',
+}
+
+function 出处名(源) {
+  if (!源) return '没写出处'
+  return 出处表[源] || String(源)
+}
+
 export function 造所有记忆页({ React, el, get, post, B, S, G, rel, 类型名, 类型表, 同日, 归整, 一次最多画, 重要色 }) {
       const 选择器 = 造选择器({ React, el })
 
@@ -477,14 +493,25 @@ export function 造所有记忆页({ React, el, get, post, B, S, G, rel, 类型�
                     whiteSpace: 'nowrap',
                   }),
                   // 悬停显示完整标题；标题拿不到时显示会话 id，方便对照
-                  title: 全局 ? '全局记忆：每个对话都能看到' : (m.sessionTitle ? m.sessionTitle + '（' + (m.sessionId || '') + '）' : m.sessionId || ''),
+                  // ⭐ 1.12.88：会话 id 的字段名在这一条链上有三种叫法 ——
+                  //   ① `/all` 接口输出的是 **`session`**（`lib/routes-core.mjs` 的 `一条()`）
+                  //   ② 老界面代码读 `sessionId`
+                  //   ③ 经历提取写进库时叫 `fromSession`（`lib/episode.mjs` 的 `造条目`）
+                  //   只认其中一个时，事件类条目全显示成「指定会话 · ？」，看起来像不知道挂在哪。
+                  title: 全局
+                    ? '全局记忆：每个对话都能看到'
+                    : m.sessionTitle
+                      ? m.sessionTitle + '（' + (m.session || m.sessionId || m.fromSession || '') + '）'
+                      : m.session || m.sessionId || m.fromSession || '',
                 },
                 全局
                   ? '全局记忆'
                   : 是工区
                     ? '工作区记忆'
                     : '指定会话 · ' +
-                      (m.sessionTitle || String(m.sessionId || '').replace(/^session-/, '').slice(0, 8) || '？'),
+                      (m.sessionTitle ||
+                        String(m.session || m.sessionId || m.fromSession || '').replace(/^session-/, '').slice(0, 8) ||
+                        '？'),
               ),
               m.type ? el('span', { style: G.badge }, 类型名(m.type) || m.type) : null,
               m.category === 'stable_profile' ? el('span', { style: G.badge }, '长期设定') : null,
@@ -497,7 +524,9 @@ export function 造所有记忆页({ React, el, get, post, B, S, G, rel, 类型�
               el(
                 'span',
                 null,
-                (m.source || '没写出处') +
+                // ⭐ 1.12.88：`source` 里有几个是内部标识符（英文），直接吐给用户太生硬。
+                //   只翻译认得的那几个，其余原样显示（「档案导入：…」「她自己记的」本来就是中文）。
+                出处名(m.source) +
                   ' · ' +
                   (删了
                     ? m.deletedAt

@@ -1,3 +1,25 @@
+## 1.12.88（2026-11-22）
+
+记忆列表里那批「指定会话 · ？」终于说清是谁了 —— 字段名对不上，不是数据缺了。
+
+**病根**：经历提取（`lib/episode.mjs` 的 `造条目`）把会话写在 **`fromSession`** 里，
+而记忆行渲染（`src/client/pages/memories.js`）读的是 **`sessionId`** / `sessionTitle`。
+两个名字互不相干，于是 `sessionId` 取空、只能打 `？`。
+
+真库对账：`source === 'episode-extract'` 共 103 条（`stable_profile` 44 / `event` 59），
+**每一条都有 `fromSession`，没有一条有 `sessionId`**。
+其中 `event` 类在界面上按作用域算 session（`category` 决定的，本来就对），
+所以显示成「指定会话 · ？」—— 看上去像「不知道挂在哪」，其实数据一直都在。
+
+**改法**：渲染两处（标签文字 + 悬停 title）都改成 `m.sessionId || m.fromSession`，
+`sessionTitle` 仍然优先。老记忆没有这两个字段时还是显示 `？`（459 条 `scope` 为
+undefined 的历史条目，本来就无从得知会话）。
+
+**顺手记下**：`scope` 与显示的关系是 `stable_profile → 全局` / `workspace → 工作区` /
+其余 → 指定会话，这不是 bug，是当初的设计。
+
+**验证**：`820 用例（817 过 / 3 跳过 / 0 失败，2026-11-22 实测）`。
+
 ## 1.12.87（2026-11-22）
 
 **补记说清「这个会话为什么不能补」，不再让按钮灰着不说话。**

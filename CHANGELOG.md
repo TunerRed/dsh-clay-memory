@@ -1,3 +1,25 @@
+## 1.12.81 — 2026-11-22
+
+**同一句输入只算一次注入。**
+
+### 病根
+
+`agent.ctx.systemPrompt.context({ name: 'memory', text })` 的 `text()` 在同一个 turn 里会被反复调用（宿主每个 step 都重新渲染 runtime-context），而它每次都重新算一遍召回。相同输入本该得到相同结果，实际拿到的 memory 段却在 2~3 个版本之间来回跳：实测 `session-eb51a18e` 的 turn 19 里 11 条快照的 memory hash 是 `f785 → 854e → a325 → f785 → …` 三版本循环，字数 2109 / 1785 / 2041。
+
+宿主 `RuntimeContextProjection.project()` 有 `deepEqualJson(previous, sections)` 短路，内容一致就不追加；所以内容一抖，它就把整段（约 2 KB）当成新消息追加一次。184 条 runtime-context 快照里有 183 条是这么来的，占全会话 1787 条事件的 10.3%。
+
+### 改法（`lib/index.js`）
+
+- 新增 `let 注入缓存 = { 键: '', 值: null }`，随 agent 作用域存一份。
+- `text()` 外面包一层闭包：先算键 `lastText + '\0' + 暂停到(sid)`，命中缓存直接返回上次结果、不重算；未命中才跑原来的计算并写回缓存。
+- 收到新一句用户消息（`lastText = txt` 那里）就把缓存清空 —— 换了问句必须重算，缓存只在「同一句输入」内有效。
+
+### 验证
+
+- `node --check lib/index.js` 通过，1423 行。
+- `npm test` → **817 用例（814 过 / 3 跳过 / 0 失败，2026-11-22 实测）**，与补丁前一致。
+- 真机要重启桌面才生效，重启后看 `session.v4.jsonl.zstd` 里 runtime-context 的条数有没有明显下降。
+
 ## 1.12.80 — 2026-11-22
 
 **体检「兼容性自检」加第 13 项：会话落盘水位——抓「召回还在跑、会话文件却没写进去」。**

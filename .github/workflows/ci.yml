@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # 只在 Windows 上跑：测试里大量断言写的是 Windows 盘符路径（G:/…、C:/…），
+    # Linux / macOS 上 existsSync('G:/') 恒为 false，会一片红，跑它没意义。
+    name: windows-2022 / Node 24
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      # 插件零运行时依赖（只用 Node 内置模块），所以没有 npm ci 这一步。
+      # 注意：必须用 npm test，直接 node --test tests/ 会多挂 1 条（glob 展开差异）。
+      - name: 测试（npm test）
+        shell: bash
+        run: npm test
+      - name: 页面构建产物与源码一致（check:client）
+        shell: bash
+        run: npm run check:client
+      - name: 文档里的数字与代码一致（check:docs）
+        shell: bash
+        run: npm run check:docs

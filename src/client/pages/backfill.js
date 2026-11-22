@@ -38,8 +38,9 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
   }
 
   function 补记页(props) {
-    // 1.12.86: 放进会话详情当页签时，panel 会传 { 初始会话: s.id }
+    // 1.12.86: 放进会话详情当页签时，panel 会传 { 初始会话: s.id, 可见: ... }
     const 想要的会话 = (props && props.初始会话) || 初始会话 || ''
+    const 可见 = props && props.可见 !== undefined ? !!props.可见 : true
     // 1.12.86：从会话详情的「补记」页签进来时，会话已经定了 —— 第一步「选会话」整块不出。
     const 直接进 = !!想要的会话
     const [会话们, set会话们] = useState([])
@@ -47,6 +48,7 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
     const [候选, set候选] = useState(null)
     const [勾, set勾] = useState({})
     const [批次们, set批次们] = useState([])
+    const [确认撤, set确认撤] = useState('')
     const [忙, set忙] = useState('')
     const [错, set错] = useState('')
     const [提示, set提示] = useState('')
@@ -63,17 +65,18 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
             set会话们([])
             return
           }
-          set会话们(Array.isArray(r.会话们) ? r.会话们 : [])
+          const 列 = Array.isArray(r.会话们) ? r.会话们 : []
+          set会话们(列)
           set诊断(r.当前诊断 && r.当前诊断.会话 ? r.当前诊断 : null)
-          // 1.12.86: 从会话详情跳过来时带着 id，优先选它（省掉「再挑一遍会话」）
-          if (!选中) {
-            const 想要 = (r.会话们 || []).find((x) => x.会话 === 想要的会话)
-            if (想要) set选中(想要.文件)
-            // 1.12.86 修：从会话详情进来却找不到这个会话时，**绝不悄悄换一个** ——
-            //   之前这里会 fallback 到列表第一个，于是「提取」出来的其实是别的会话的内容，
-            //   用户完全看不出来（2026-11-22 主人实测撞到）。
-            else if (!想要的会话 && r.会话们 && r.会话们.length) set选中(r.会话们[0].文件)
-          }
+          // 用函数式更新避免闭包读到旧 选中，且从详情进找不到当前会话时不悄悄换别的
+          set选中((旧) => {
+            if (想要的会话) {
+              const 想要 = 列.find((x) => x.会话 === 想要的会话)
+              return 想要 ? 想要.文件 : ''
+            }
+            if (旧 && 列.some((x) => x.文件 === 旧)) return 旧
+            return 列.length ? 列[0].文件 : ''
+          })
         })
         .catch((e) => set错(String((e && e.message) || e)))
         .finally(() => set忙(''))
@@ -93,19 +96,26 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
     }
 
     useEffect(() => {
+      set选中('')
+      set候选(null)
+      set勾({})
+      set确认撤('')
+      set错('')
+      set提示('')
+      set诊断(null)
+    }, [想要的会话])
+
+    useEffect(() => {
+      if (!可见) return
       拉会话()
       拉批次()
       // eslint-disable-next-line
-    }, [])
+    }, [想要的会话, 可见])
 
     const 这条 = 会话们.find((x) => x.文件 === 选中) || null
 
     function 试提取() {
-      if (!这条) {
-        // 1.12.87：原因常驻显示在上面（红字），这里不再补一句 —— 主人说那句「有点土」。
-        //   按钮本身在没选中时是灰的，配上头上那行红字已经够了。
-        return
-      }
+      if (!这条) return
       set忙('预览')
       set错('')
       set提示('')
@@ -155,9 +165,7 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
 
     function 撤批次(批) {
       if (!批) return
-      if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-        if (!window.confirm('撤销批次 ' + 批 + '？\n\n· 这一批写进去的条目会被删掉\n· 被它取代的旧条目会恢复原样')) return
-      }
+      set确认撤('')
       set忙('撤销')
       set错('')
       set提示('')
@@ -294,7 +302,13 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
                     c.为什么 ? el('span', { style: { ...S.dim, fontSize: 11 } }, c.为什么) : null,
                   ),
                   el('div', { style: { fontSize: 12.5, marginTop: 2, wordBreak: 'break-word' } }, String(c.text || '')),
-                  c.撞上 ? el('div', { style: { ...S.dim, fontSize: 11, marginTop: 2 } }, '跟这条像：' + String(c.撞上)) : null,
+                  c.撞上
+                    ? el(
+                        'div',
+                        { style: { ...S.dim, fontSize: 11, marginTop: 2, wordBreak: 'break-word' } },
+                        '跟这条像：' + (typeof c.撞上 === 'object' ? String(c.撞上.text || c.撞上.id || '') : String(c.撞上 || '')),
+                      )
+                    : null,
                 ),
               ),
             ),
@@ -326,7 +340,14 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
                 el('span', { style: { fontFamily: 'monospace', fontSize: 11.5 } }, String(b.批次 || '')),
                 el('span', { style: S.dim }, Number(b.条数 || 0) + ' 条'),
                 el('span', { style: { ...S.dim, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, 那天(b.时间)),
-                el('button', { style: S.btnDanger, onClick: () => 撤批次(b.批次), disabled: !!忙 }, 忙 === '撤销' ? '撤销中…' : '撤销'),
+                确认撤 === b.批次
+                  ? el(
+                      'span',
+                      { style: { display: 'inline-flex', gap: 4 } },
+                      el('button', { style: S.btnDanger, onClick: () => 撤批次(b.批次), disabled: !!忙 }, 忙 === '撤销' ? '撤销中…' : '确定撤销'),
+                      el('button', { style: S.btn, onClick: () => set确认撤(''), disabled: !!忙 }, '取消'),
+                    )
+                  : el('button', { style: S.btnDanger, onClick: () => set确认撤(b.批次), disabled: !!忙 }, '撤销'),
               ),
             ),
           ),

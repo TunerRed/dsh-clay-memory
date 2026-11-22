@@ -1423,7 +1423,7 @@ export function 造会话页({ React, el, get, post, B, S, rel, impName, 一次�
             React.createElement(
               'div',
               { style: { display: 详情页 === '补记' ? 'block' : 'none' } },
-              补记页 ? React.createElement(补记页, { 初始会话: s.id }) : null,
+              补记页 ? React.createElement(补记页, { key: s.id, 初始会话: s.id, 可见: 详情页 === '补记' }) : null,
             ),
           )
         }

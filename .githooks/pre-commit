@@ -1,0 +1,19 @@
+#!/bin/sh
+# 提交前拦截敏感信息（gitleaks 扫暂存区）
+# 明知有风险时可以用 git commit --no-verify 绕过，但别养成习惯
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "[pre-commit] 没找到 gitleaks，跳过敏感信息扫描" >&2
+    exit 0
+fi
+
+if ! gitleaks git --pre-commit --staged --redact --no-banner -v; then
+    echo "" >&2
+    echo "==========================================" >&2
+    echo " 提交被拦下：暂存区里有疑似敏感信息" >&2
+    echo "==========================================" >&2
+    echo " 误报 -> 写进 .gitleaks.toml 的 allowlist" >&2
+    echo " 真泄露 -> git reset HEAD <file>，脱敏或删除后再提交" >&2
+    echo " 非推不可 -> git commit --no-verify（不推荐）" >&2
+    exit 1
+fi

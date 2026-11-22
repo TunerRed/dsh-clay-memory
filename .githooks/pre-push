@@ -1,0 +1,27 @@
+#!/bin/sh
+# push 前扫「这次要推上去」的 commit（相对上游）
+# 已推送过的历史不在此检查范围 —— 出去了就收不回来，拦也白拦
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "[pre-push] 没找到 gitleaks，跳过检查" >&2
+    exit 0
+fi
+
+base="$(git rev-parse --verify --quiet '@{push}' 2>/dev/null)"
+[ -z "$base" ] && base="$(git rev-parse --verify --quiet '@{upstream}' 2>/dev/null)"
+
+if [ -z "$base" ]; then
+    echo "[pre-push] 没有上游分支，跳过范围检查" >&2
+    echo "[pre-push] 想手扫全部历史: gitleaks git . -v --redact" >&2
+    exit 0
+fi
+
+if ! gitleaks git --log-opts="$base..HEAD" --redact --no-banner -v; then
+    echo "" >&2
+    echo "==========================================" >&2
+    echo " push 被拦下：要推的 commit 里有疑似密钥" >&2
+    echo "==========================================" >&2
+    echo " 处理: git rebase -i $base   # 把相关 commit 改干净" >&2
+    echo " 或:   git reset --soft $base  # 退回重做提交" >&2
+    exit 1
+fi

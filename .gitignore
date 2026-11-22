@@ -1,0 +1,53 @@
+# 依赖
+node_modules/
+
+# 调试脚本与临时产物
+tmp/
+*.log
+
+# 备份 / 原子写留下的副本
+*.bak
+*.bak-*
+*.bak.*
+*.before-*
+*.tmp
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 基准数据（含真实记忆库快照与真实问句，不发布）
+tools/bench/S0-baseline.json
+tools/bench/S0-data-snapshot.tar
+tools/bench/queries.json
+tools/bench/P3-queries.json
+
+# 开发文档里没脱敏的那两份（真实记忆条目 id / 真实问句，不发布）
+# 其余设计文档已进 git
+docs/private/
+
+# 本机骨架数据（含主人私有画像，不发布）
+_core.json
+
+# 临时探测脚本
+_probe_traces.mjs
+_tmp-testhome/
+
+# 语义模型（本地下载，不进 git；114MB 二进制）
+models/
+
+# 修复补丁
+patches/
+
+# 敏感凭据（绝不入库）
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials.json
+secrets.*

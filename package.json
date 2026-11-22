@@ -1,0 +1,86 @@
+{
+  "name": "dsh-clay-memory",
+  "version": "1.12.79",
+  "description": "给 DSH 里的会话一份会淡忘的长期记忆，每条都带时间。",
+  "icon": "icon.svg",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "memory",
+    "long-term-memory",
+    "ai-companion",
+    "clay-memory"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TunerRed/dsh-clay-memory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TunerRed/dsh-clay-memory/issues"
+  },
+  "homepage": "https://github.com/TunerRed/dsh-clay-memory#readme",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./locale/*": "./locale/*",
+    "./icon": "./icon.svg",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "tools",
+    "!tools/bench/S0-data-snapshot.tar",
+    "!tools/bench/S0-baseline.json",
+    "!tools/bench/queries.json",
+    "!tools/bench/P3-queries.json",
+    "!tools/bench/eval-inject.mjs",
+    "locale",
+    "icon.svg",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "slots"
+      ],
+      "external": [
+        "react"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "*",
+    "@deepseek-ai/dsh-tools": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-llm": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "acorn": "^8.19.0",
+    "esbuild": "^0.28.2"
+  },
+  "scripts": {
+    "build:client": "node tools/build-client.mjs",
+    "check:client": "node tools/check-client-build.mjs",
+    "ui-check": "node tools/ui-check.mjs",
+    "test": "node --test tests/*.test.mjs tests/coverage/*.test.mjs",
+    "doctor": "node tools/doctor.mjs",
+    "check:docs": "node tools/check-doc-numbers.mjs"
+  }
+}

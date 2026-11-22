@@ -76,7 +76,12 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
     function 拉批次() {
       get('/backfill/batches')
         .then((r) => {
-          if (r && r.ok) set批次们(Array.isArray(r.批次们) ? r.批次们 : [])
+          if (r && r.ok) {
+            const 全 = Array.isArray(r.批次们) ? r.批次们 : []
+            // 1.12.86：在会话详情里的「补记」页签，只看得见这个会话的批次 ——
+            //   撤销是按「批次」走的、不按会话，把别的会话的批次也列出来太容易误点。
+            set批次们(想要的会话 ? 全.filter((b) => b.会话 === 想要的会话) : 全)
+          }
         })
         .catch(() => {})
     }
@@ -218,7 +223,7 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
       直接进 ? el('div', { style: { ...S.dim, marginTop: 6 } }, '补记的就是这个会话，不用再挑。') : null,
 
       // ── 第二步：预览 ──
-      el('div', { style: S.sec }, el('div', { style: S.secH }, el('span', { style: S.secTitle }, '② 看它想记什么'))),
+      el('div', { style: S.sec }, el('div', { style: S.secH }, el('span', { style: S.secTitle }, '看它想记什么'))),
       el(
         'div',
         { style: { ...S.row, marginTop: 6 } },
@@ -288,7 +293,7 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
       el(
         'div',
         { style: S.sec },
-        el('div', { style: S.secH }, el('span', { style: S.secTitle }, '③ 补记批次')),
+        el('div', { style: S.secH }, el('span', { style: S.secTitle }, '补记批次')),
         el('span', { style: S.secTag }, 批次们.length + ' 个'),
       ),
       批次们.length === 0

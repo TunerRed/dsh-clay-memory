@@ -50,11 +50,13 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
     const [忙, set忙] = useState('')
     const [错, set错] = useState('')
     const [提示, set提示] = useState('')
+    // 1.12.87：这个会话够不够补记，由后端算好告诉我 —— 按钮不再灰着不说话
+    const [诊断, set诊断] = useState(null)
 
     function 拉会话() {
       set忙('会话')
       set错('')
-      get('/backfill/sessions')
+      get('/backfill/sessions' + (想要的会话 ? '?当前=' + encodeURIComponent(想要的会话) : ''))
         .then((r) => {
           if (!r || !r.ok) {
             set错((r && r.error) || '拿不到会话列表')
@@ -62,6 +64,7 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
             return
           }
           set会话们(Array.isArray(r.会话们) ? r.会话们 : [])
+          set诊断(r.当前诊断 && r.当前诊断.会话 ? r.当前诊断 : null)
           // 1.12.86: 从会话详情跳过来时带着 id，优先选它（省掉「再挑一遍会话」）
           if (!选中) {
             const 想要 = (r.会话们 || []).find((x) => x.会话 === 想要的会话)
@@ -98,7 +101,11 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
     const 这条 = 会话们.find((x) => x.文件 === 选中) || null
 
     function 试提取() {
-      if (!这条) return
+      if (!这条) {
+        // 1.12.87：原因常驻显示在上面（红字），这里不再补一句 —— 主人说那句「有点土」。
+        //   按钮本身在没选中时是灰的，配上头上那行红字已经够了。
+        return
+      }
       set忙('预览')
       set错('')
       set提示('')
@@ -226,10 +233,10 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
       直接进
         ? el(
             'div',
-            { style: { ...S.dim, marginTop: 6 } },
+            { style: 选中 ? { ...S.dim, marginTop: 6 } : { ...S.drop, marginTop: 6 } },
             选中
               ? '补记的就是这个会话，不用再挑。'
-              : '这个会话还不在可补记的范围里：要至少 6 条真正对话、而且我至少回过 2 句（太短的会话补记没意义，也容易把整段闲聊当事实记下来）。',
+              : ((诊断 && 诊断.为什么) || '这个会话还不在可补记的范围里：要至少 6 条真正对话、而且我至少回过 2 句。'),
           )
         : null,
 

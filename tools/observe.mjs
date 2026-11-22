@@ -105,6 +105,7 @@ export function analyzeTraces({ files = [], facts = null, now, days = 0, home = 
   const omissions = { 知识: {}, 画像: {} }
   const groups = new Map()
   let selected = 0, selectedRounds = 0, empty = 0, nonempty = 0, fallbackRounds = 0, zeroRecall = 0
+  let zeroRecallTurn = 0, zeroRecallTurnBase = 0
   let totalChars = 0, totalRounds = 0, memoryChars = 0, memoryRounds = 0
   let exactFactChars = 0, estimatedFactChars = 0, budgetUsage = 0, budgetRounds = 0
   let factRounds = 0
@@ -139,7 +140,13 @@ export function analyzeTraces({ files = [], facts = null, now, days = 0, home = 
     else quality.无法判断空注入轮数++
     // 「注入区有没有字」和「有没有召回到记忆」是两件事：兜底文案会往注入区写几十个字，
     // 于是一个记忆都没召回的轮次在空注入里看不出来。零召回单独数，才不会被兜底盖住。
-    if (selectedCount === 0) zeroRecall++
+    if (selectedCount === 0) {
+      zeroRecall++
+      // 老记录（没有 turn 字段，11-04 那批）一条就是一条，会把分母撑大几十倍；
+      // 单独再数一份「只算有 turn 的轮」，才是能跟人对话对照的真实召回率。
+      if (t.turn !== null && t.turn !== undefined) zeroRecallTurn++
+    }
+    if (selectedCount !== null && t.turn !== null && t.turn !== undefined) zeroRecallTurnBase++
 
     if (meta) {
       quality.selectedMeta轮数++
@@ -220,6 +227,7 @@ export function analyzeTraces({ files = [], facts = null, now, days = 0, home = 
     口径: 'picked 不按事实 ID 过滤（缺 picked 时用 selectedMeta 条数）；完整上下文仅使用 totalChars，含骨架/项目/兜底；字仅为记忆或兜底渲染。均值仅针对对应字段已知的轮，缺失不补零。',
     空注入口径: 'picked/selectedMeta 有条目，或 字/totalChars > 0 即非空；缺少判断依据计 unknown。空注入率分母为已知空/非空轮数。注意这是「注入区有没有字」——兜底文案也会让注入区有字，想看「有没有召回到记忆」请看零召回。',
     零召回口径: 'picked/selectedMeta 一条都没有的轮次占比，分母为有 picked 信息的轮。兜底文案（fallback）写进注入区但不是记忆，所以零召回不会被兜底盖住。',
+    零召回双口径说明: '零召回的轮 / 零召回率 用的是全部去重轮（含没有 turn 的老记录，一条算一轮，会把分母撑大）；零召回轮数按turn / 零召回率按turn 只算有 turn 字段的轮，那一份才对应「每轮对话」的真实比例，看召回健康请用这一对。',
     每轮条数: average(selected, selectedRounds, 2), 条次: selected, 条数覆盖轮数: selectedRounds,
     每轮字数: average(totalChars, totalRounds), 完整上下文字合计: totalRounds ? totalChars : null,
     完整上下文字覆盖轮数: totalRounds, 完整上下文字unknown轮数: count - totalRounds,
@@ -228,6 +236,8 @@ export function analyzeTraces({ files = [], facts = null, now, days = 0, home = 
     空注入: empty, 非空注入: nonempty, unknown轮数: quality.无法判断空注入轮数,
     空注入率: percent(empty, empty + nonempty), 兜底轮数: fallbackRounds,
     零召回的轮: zeroRecall, 零召回率: percent(zeroRecall, selectedRounds),
+    零召回轮数按turn: zeroRecallTurn, 零召回率按turn: percent(zeroRecallTurn, zeroRecallTurnBase),
+    按turn分母: zeroRecallTurnBase, 无turn记录轮数: records.filter((r) => r.turn === null || r.turn === undefined).length,
     预算利用率: average(budgetUsage, budgetRounds), 预算覆盖轮数: budgetRounds,
     预算口径: '仅计算 字 / 同轮 policySnapshot.maxChars；不以当前配置或 totalChars 替代记忆预算。',
   }
@@ -301,7 +311,7 @@ export function formatReport(result) {
     '- 每轮选中：' + show(all.每轮条数) + ' 条；完整上下文：' + show(all.每轮字数) + ' 字（覆盖 ' + all.完整上下文字覆盖轮数 + '/' + result.轮数 + ' 轮）',
     '- 记忆或兜底渲染：' + show(all.每轮记忆渲染字) + ' 字（覆盖 ' + all.记忆渲染字覆盖轮数 + '/' + result.轮数 + ' 轮）',
     '- 空注入：' + all.空注入 + '；非空：' + all.非空注入 + '；unknown：' + all.unknown轮数 + '；空注入率：' + show(all.空注入率) + '%',
-    '- 零召回（一条记忆都没进来）：' + all.零召回的轮 + ' 轮 / ' + show(all.零召回率) + '%；带兜底文案的轮：' + all.兜底轮数 + '（兜底会让注入区有字，所以零召回不等于空注入）',
+    '- 零召回（一条记忆都没进来）：全量 ' + all.零召回的轮 + ' 轮 / ' + show(all.零召回率) + '%；**按 turn 口径 ' + all.零召回轮数按turn + ' / ' + all.按turn分母 + ' 轮 = ' + show(all.零召回率按turn) + '%**（无 turn 的老记录 ' + all.无turn记录轮数 + ' 条没算进这个分母）；带兜底文案的轮：' + all.兜底轮数 + '（兜底会让注入区有字，所以零召回不等于空注入）',
     '- 预算利用率：' + show(all.预算利用率) + '%（历史配置覆盖 ' + all.预算覆盖轮数 + ' 轮）',
     all.空注入口径, all.预算口径,
     '', '## 算法/配置分组（null 表示 unknown）', '',

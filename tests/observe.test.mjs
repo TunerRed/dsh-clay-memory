@@ -396,3 +396,18 @@ test('CLI 空或损坏事实快照不崩溃，不制造池和历史字符数', (
   assert.equal(result.整体注入.每轮字数, null)
   assert.equal(result.覆盖.非法JSON条数, 1)
 })
+
+test('零召回双口径：没有 turn 的老记录不进「按 turn」的分母', () => {
+  const result = analyze([
+    trace({ turn: 1, picked: [], 字: 30, fallback: true }),
+    trace({ turn: 2, picked: ['k'] }),
+    trace({ turn: undefined, step: undefined, picked: [], 字: 30, fallback: true }),
+  ])
+  // 全量口径：3 轮里 2 轮零召回（老记录一条算一轮）
+  assert.equal(result.整体注入.零召回的轮, 2)
+  assert.equal(result.整体注入.无turn记录轮数, 1)
+  // 按 turn 口径：只算 2 轮有 turn 的，其中 1 轮零召回 —— 这才是能跟人对话对照的比例
+  assert.equal(result.整体注入.零召回轮数按turn, 1)
+  assert.equal(result.整体注入.按turn分母, 2)
+  assert.equal(result.整体注入.零召回率按turn, 50)
+})

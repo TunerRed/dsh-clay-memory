@@ -10,12 +10,17 @@ import { fileURLToPath } from 'node:url'
 // 2026-11-16：仓库从本地临时目录迁到固定仓库目录，路径改成按测试文件位置算，别再写死盘符。
 const 仓库根 = join(dirname(fileURLToPath(import.meta.url)), '..')
 const 根 = join(仓库根, 'src/client')
+const 收集JS = (目录) =>
+  readdirSync(目录, { withFileTypes: true }).flatMap((d) => {
+    const p = join(目录, d.name)
+    if (d.isDirectory()) return 收集JS(p)
+    return d.name.endsWith('.js') ? [p] : []
+  })
 const src =
-  readFileSync(根 + '/正文.js', 'utf8') +
+  readFileSync(根 + '/app.js', 'utf8') +
   '\n' +
-  readdirSync(根 + '/pages')
-    .filter((f) => f.endsWith('.js'))
-    .map((f) => readFileSync(根 + '/pages/' + f, 'utf8'))
+  收集JS(根 + '/pages')
+    .map((p) => readFileSync(p, 'utf8'))
     .join('\n')
 const 服务端 = readdirSync(join(仓库根, 'lib'))
   .filter((f) => /^routes-.*\.mjs$/.test(f))

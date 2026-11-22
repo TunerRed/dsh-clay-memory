@@ -8,7 +8,7 @@
 // 其余标识符里，去掉 import、属性名、全局白名单，剩下的就是可疑的自由变量。
 // 这样宁可漏报，不会误报——误报会让人不再信这个检查。
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { parse } from 'acorn'
 
 const 全局白名单 = new Set([
@@ -76,15 +76,23 @@ const 扫一个文件 = (路径) => {
   return 可疑
 }
 
+const 收集JS = (p) =>
+  readdirSync(p, { withFileTypes: true }).flatMap((d) => {
+    const full = join(p, d.name)
+    if (d.isDirectory()) return 收集JS(full)
+    return d.name.endsWith('.js') ? [full] : []
+  })
+
 const 目录 = process.argv[2] ?? 'src/client'
 const 页目录 = join(目录, 'pages')
-const 文件们 = readdirSync(页目录).filter((f) => f.endsWith('.js'))
+const 文件们 = 收集JS(页目录)
 let 有问题 = false
-for (const f of 文件们) {
-  const 可疑 = 扫一个文件(join(页目录, f))
+for (const fp of 文件们) {
+  const 可疑 = 扫一个文件(fp)
   if (!可疑.length) continue
   有问题 = true
-  for (const [名, 行] of 可疑) console.log(`${f}:${行}  「${名}」既没声明也没传进来`)
+  const 标签 = relative(页目录, fp)
+  for (const [名, 行] of 可疑) console.log(`${标签}:${行}  「${名}」既没声明也没传进来`)
 }
 // 默认模式下顺带扫 lib/（不含打包产物 client.js），防拆层漏 import（如 TZ_OFFSET / MEMORY_PAGE / 生成档案）
 let 后端数 = 0

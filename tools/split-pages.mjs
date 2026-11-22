@@ -1,6 +1,6 @@
-// 通用拆分器：把 正文.js 里若干顶层函数整块搬到 src/client/pages/<文件>.js
+// 通用拆分器：把 app.js 里若干顶层函数整块搬到 src/client/pages/<文件>.js
 // 用法：node tools/split-pages.mjs <模块名> <文件> <导出名1,导出名2,...> <要搬的函数名1,函数名2,...>
-// 规则：搬走的函数之间可以互相调用（都在同一模块内）；正文里只保留用得到的那几个导出。
+// 规则：搬走的函数之间可以互相调用（都在同一模块内）；主装配层里只保留用得到的那几个导出。
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const [模块名, 文件, 导出串, 搬走串] = process.argv.slice(2)
@@ -11,7 +11,7 @@ if (!模块名 || !文件 || !导出串 || !搬走串) {
 const 导出名们 = 导出串.split(',').map((s) => s.trim()).filter(Boolean)
 const 搬走名们 = 搬走串.split(',').map((s) => s.trim()).filter(Boolean)
 
-const 路径 = 'src/client/正文.js'
+const 路径 = 'src/client/app.js'
 let 行 = readFileSync(路径, 'utf8').split('\n')
 
 function 找函数(名) {

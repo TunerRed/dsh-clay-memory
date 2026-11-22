@@ -1,5 +1,5 @@
-// DSH 黏土记忆 · 客户端入口：套宿主模块加载器的壳，正文在 正文.js
-import { 装客户端 } from './正文.js'
+// DSH 黏土记忆 · 客户端入口：套宿主模块加载器的壳，主装配层在 app.js
+import { 装客户端 } from './app.js'
 
 window.__ModuleLoader__.load({
   id: 'dsh-clay-memory',

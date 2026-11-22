@@ -532,7 +532,8 @@ test('MEMORY_PAGE：是一份完整可打开的页面，且前端打的接口都
   const 打的接口 = new Set()
   for (const m of MEMORY_PAGE.matchAll(/fetch\('([^']+)'/g)) 打的接口.add(m[1].split('?')[0])
   assert.ok(打的接口.size > 0, '这份内嵌页该会打接口（否则下面的校验没意义）')
-  const 服务端 = ['routes-core.mjs', 'routes-admin.mjs', 'routes-gen.mjs', 'routes-guard.mjs', 'routes-stale.mjs', 'routes-health.mjs']
+  const 服务端 = readdirSync(join(仓库根, 'lib'))
+    .filter((f) => /^routes-.*\.mjs$/.test(f))
     .map((f) => readFileSync(join(仓库根, 'lib', f), 'utf8')).join('\n')
   for (const p of 打的接口) {
     assert.ok(服务端.includes(`'${p}'`), `内嵌页打的接口 ${p} 在服务端没注册 ⇒ 点了就是 404`)

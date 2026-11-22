@@ -7,7 +7,7 @@ import { 渲染工作区记忆视图 } from './sessions/workspace-view.js'
 import { 造一条记忆渲染 } from './sessions/memory-item.js'
 import { 造批量维护动作 } from './sessions/batch-actions.js'
 
-export function 造会话页({ React, el, get, post, B, S, rel, impName, 一次最多画, 进度, 改进度, 补标进度, 洗键进度 }) {
+export function 造会话页({ React, el, get, post, B, S, rel, impName, 一次最多画, 进度, 改进度, 补标进度, 洗键进度, 补记页 }) {
       const 选择器 = 造选择器({ React, el })
       const 渲染一条记忆 = 造一条记忆渲染({ React, post, rel, impName, S, 选择器 })
 
@@ -521,6 +521,7 @@ export function 造会话页({ React, el, get, post, B, S, rel, impName, 一次�
               'div',
               { style: Object.assign({}, S.dim, { fontSize: 12, marginTop: 2, overflowWrap: 'anywhere' }) },
               '事实是所有会话共用的（在哪个会话里删，哪儿都会忘）；事件只属于这个会话。',
+
             ),
             // ⭐ 1.4.0（需求③）：分支继承那一侧的提示 —— 事实不用继承（已经全局了），
             //   从前端这头也把话说明白，别让人以为「分支没把事实带过来」是漏了 ✓
@@ -550,6 +551,7 @@ export function 造会话页({ React, el, get, post, B, S, rel, impName, 一次�
                 ['称呼', '称呼', '她在这儿的名字、她怎么称呼你'],
                 ['导入记录', '导入记录', '导过哪几批（只读）+ 撤销这一批'],
                 ['召回记录', '召回记录', '最近一次召回挑中了什么 + 备份怎么留'],
+                ['补记', '补记', '把这段聊过、但当时没记下来的，按现在的偏好重新过一遍'],
               ].map(([k, t, 说明]) => React.createElement(
                 'button',
                 {
@@ -1417,6 +1419,12 @@ export function 造会话页({ React, el, get, post, B, S, rel, impName, 一次�
               React.createElement(导入记录页, { open: open, load: load }),
             ),
             渲染召回记录页签({ React, S, s, tr, 详情页 }),
+            // 1.12.86: 「补记」进会话详情当页签 —— 所有内容都针对这个会话，不再是外面那个要选会话的页面
+            React.createElement(
+              'div',
+              { style: { display: 详情页 === '补记' ? 'block' : 'none' } },
+              补记页 ? React.createElement(补记页, { 初始会话: s.id }) : null,
+            ),
           )
         }
   

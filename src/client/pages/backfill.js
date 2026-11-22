@@ -13,7 +13,7 @@
 //
 // ⚠ 这一页的花 token 只有「预览」一下（一次模型请求）。列会话、应用、撤销都不调模型。
 // ============================================================================
-export function 造补记页({ React, el, get, post, S }) {
+export function 造补记页({ React, el, get, post, S, 初始会话 }) {
   const { useState, useEffect } = React
 
   const 动作名 = { add: '新增', update: '改写', noop: '跳过' }
@@ -37,7 +37,11 @@ export function 造补记页({ React, el, get, post, S }) {
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes())
   }
 
-  function 补记页() {
+  function 补记页(props) {
+    // 1.12.86: 放进会话详情当页签时，panel 会传 { 初始会话: s.id }
+    const 想要的会话 = (props && props.初始会话) || 初始会话 || ''
+    // 1.12.86：从会话详情的「补记」页签进来时，会话已经定了 —— 第一步「选会话」整块不出。
+    const 直接进 = !!想要的会话
     const [会话们, set会话们] = useState([])
     const [选中, set选中] = useState('')
     const [候选, set候选] = useState(null)
@@ -58,7 +62,12 @@ export function 造补记页({ React, el, get, post, S }) {
             return
           }
           set会话们(Array.isArray(r.会话们) ? r.会话们 : [])
-          if (!选中 && r.会话们 && r.会话们.length) set选中(r.会话们[0].文件)
+          // 1.12.86: 从会话详情跳过来时带着 id，优先选它（省掉「再挑一遍会话」）
+          if (!选中) {
+            const 想要 = (r.会话们 || []).find((x) => x.会话 === 想要的会话)
+            if (想要) set选中(想要.文件)
+            else if (r.会话们 && r.会话们.length) set选中(r.会话们[0].文件)
+          }
         })
         .catch((e) => set错(String((e && e.message) || e)))
         .finally(() => set忙(''))
@@ -166,14 +175,14 @@ export function 造补记页({ React, el, get, post, S }) {
       el('div', { style: { ...S.dim, marginTop: 4 } }, '只有「预览」这一步会调一次模型，其余都不花 token。'),
 
       // ── 第一步：选会话 ──
-      el('div', { style: S.sec }, el('div', { style: S.secH }, el('span', { style: S.secTitle }, '① 选一个历史会话'))),
-      el(
+      直接进 ? null : el('div', { style: S.sec }, el('div', { style: S.secH }, el('span', { style: S.secTitle }, '① 选一个历史会话'))),
+      直接进 ? null : el(
         'div',
         { style: { ...S.row, marginTop: 6 } },
         el('button', { style: S.btn, onClick: 拉会话, disabled: !!忙 }, 忙 === '会话' ? '刷新中…' : '刷新列表'),
         el('span', { style: S.dim }, '共 ' + 会话们.length + ' 个（读对话 ≥6 条、助手至少回 2 句的）'),
       ),
-      会话们.length === 0
+      直接进 ? null : 会话们.length === 0
         ? el('div', { style: { ...S.dim, marginTop: 6 } }, '没有可补记的会话。')
         : el(
             'select',
@@ -205,6 +214,8 @@ export function 造补记页({ React, el, get, post, S }) {
               ),
             ),
           ),
+
+      直接进 ? el('div', { style: { ...S.dim, marginTop: 6 } }, '补记的就是这个会话，不用再挑。') : null,
 
       // ── 第二步：预览 ──
       el('div', { style: S.sec }, el('div', { style: S.secH }, el('span', { style: S.secTitle }, '② 看它想记什么'))),

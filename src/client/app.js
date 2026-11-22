@@ -6,6 +6,7 @@ import { 造时间线页 } from './pages/timeline.js'
 import { 造回收站页 } from './pages/recycle.js'
 import { 造回复体检页 } from './pages/checkup.js'
 import { 造拦截页 } from './pages/guard.js'
+import { 造补记页 } from './pages/backfill.js' // 1.12.84：F25 历史补记（选会话 → 预览 → 写进批次 → 撤销）
 
 // DSH 黏土记忆 · 客户端正文（由加载器调用）
 export function 装客户端(require) {
@@ -629,6 +630,7 @@ const 洗键进度 = { 已: 0, 总: 0, 在跑: false, 干跑: false }
       ['回收站', '删掉的记忆都在这儿 · 能搜能找回'],
       ['体检', '助手回复的 AI 味 · 规则开关'],
       ['高级', '参数 · 整理会话 · 备份 · 版本'],
+      ['补记', '把以前聊过但没记下来的会话，按现在的偏好重新过一遍'],
     ]
 
     // ⭐ 1.8.0：一块出错不该让整个设置面板变白 —— 兜住渲染异常，给出「哪一块坏了 + 重试」
@@ -682,13 +684,14 @@ const 洗键进度 = { 已: 0, 总: 0, 在跑: false, 干跑: false }
 
     // ⭐ 1.12.71：工具拦截（B 组）—— 规则用户自己写，插件只负责拦
   const { 拦截页 } = 造拦截页({ React, el, get, post, S })
+  const { 补记页 } = 造补记页({ React, el, get, post, S })
 
   const { 高级区 } = 造高级区({ React, el, get, post, S, G, toPct, fromPct, 进度, 更新条 })
   const { 所有记忆页 } = 造所有记忆页({ React, el, get, post, B, S, G, rel, 类型名, 类型表, 同日, 归整, 一次最多画, 重要色 })
   // ⚠ 会话页里也用到组件外的进度对象（切走再回来还在）：漏传会 `ReferenceError: 进度 is not defined`，整页空白
   const { 会话页 } = 造会话页({ React, el, get, post, B, S, rel, impName, 一次最多画, 进度, 改进度, 补标进度, 洗键进度 })
 
-  const { 记忆面板 } = 造记忆面板({ React, el, get, post, S, G, B, rel, impName, toPct, fromPct, 进度, 更新条, 类型名, 类型表, 同日, 归整, 一次最多画, 重要色, 会话页, 所有记忆页, 时间线页, 回收站页, 回复体检页, 拦截页, 高级区 , 页签名, 兜底})
+  const { 记忆面板 } = 造记忆面板({ React, el, get, post, S, G, B, rel, impName, toPct, fromPct, 进度, 更新条, 类型名, 类型表, 同日, 归整, 一次最多画, 重要色, 会话页, 所有记忆页, 时间线页, 回收站页, 回复体检页, 拦截页, 补记页, 高级区 , 页签名, 兜底})
     function apply(ctx) {
       const slots = ctx.get('slots')
       if (slots === undefined) return

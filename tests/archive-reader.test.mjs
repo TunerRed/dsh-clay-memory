@@ -15,7 +15,24 @@ const 压 = (s) => zstdCompressSync(Buffer.from(s, 'utf8'))
 const 行 = (o) => JSON.stringify(o) + '\n'
 const 会话头 = 行({ type: 'session', version: 4, id: 'session-x', createdAt: 1794499232177 })
 const 用户 = 行({ type: 'user/message', seq: 8, time: 1794499232348, data: { content: [{ type: 'text', text: '主人喜欢大白饭' }] } })
-const 助手 = 行({ type: 'assistant/message', seq: 9, time: 1794499233456, data: { content: [{ type: 'text', text: '记住了' }] } })
+// ⚠ 助手消息的正文在 data.message.content，外面多套一层（带 id/role/source）。
+//   2026-11-22 之前这里写成 data.content，假数据形状与真会话不一致，
+//   于是取对话() 在真数据上一条助手消息都取不到、测试却是绿的。
+const 助手 = 行({
+  type: 'assistant/message',
+  seq: 9,
+  time: 1794499233456,
+  data: {
+    turn: 1,
+    step: 1,
+    message: {
+      id: 'imported-assistant-x-1',
+      role: 'assistant',
+      source: { kind: 'model' },
+      content: [{ type: 'text', text: '记住了' }],
+    },
+  },
+})
 
 test('单帧：能解出来', () => {
   const r = 解压归档(压(会话头))
@@ -94,6 +111,38 @@ test('取对话：只留人和助手说的话，工具消息不要', () => {
   assert.deepEqual(对话.map((x) => x.role), ['user', 'assistant'])
   assert.equal(对话[0].text, '主人喜欢大白饭')
   assert.equal(对话[1].text, '记住了')
+})
+
+test('取对话：助手正文在 data.message.content 里也认得（真会话是这种形状）', () => {
+  // 用户那种扁平形状（data.content）和助手那种带外层（data.message.content）混在一起时，
+  // 两边都要取得到，顺序按 seq 走。
+  const 扁 = 行({ type: 'assistant/message', seq: 12, time: 1, data: { content: [{ type: 'text', text: '扁平形状也要认' }] } })
+  const { 事件 } = 解析事件(会话头 + 用户 + 助手 + 扁)
+  const 对话 = 取对话(事件)
+  assert.deepEqual(对话.map((x) => x.text), ['主人喜欢大白饭', '记住了', '扁平形状也要认'])
+  assert.equal(对话[2].seq, 12)
+})
+
+test('取对话：宿主注入的 user/message 不算主人说的话（看 source.kind）', () => {
+  // 真会话里 user/message 有 1410+ 条是 runtime-context（整段 system-reminder），
+  // 还有 time-context / skill-catalog / agent-instructions。按 source.kind 判，
+  // 不能靠正则猜文本前缀 —— `Time sampled while preparing turn` 就不带尖括号。
+  const 注入 = (seq, kind, text) =>
+    行({ type: 'user/message', seq, time: seq, data: { source: { kind }, content: [{ type: 'text', text }] } })
+  const { 事件 } = 解析事件(
+    会话头
+      + 注入(20, 'runtime-context', 'The following information describes your current session:…')
+      + 注入(21, 'time-context', 'Time sampled while preparing turn 1, step 1: …')
+      + 注入(22, 'skill-catalog', 'A skill is a reusable set of task-specific instructions.')
+      + 用户
+      + 助手,
+  )
+  const 对话 = 取对话(事件)
+  assert.deepEqual(对话.map((x) => x.text), ['主人喜欢大白饭', '记住了'])
+  // source 缺失（很老的消息）时仍当主人说的话
+  const 老的 = 行({ type: 'user/message', seq: 30, time: 30, data: { content: [{ type: 'text', text: '老格式没 source' }] } })
+  const { 事件: 事件2 } = 解析事件(会话头 + 老的)
+  assert.deepEqual(取对话(事件2).map((x) => x.text), ['老格式没 source'])
 })
 
 test('找帧起点：第一个不在 0 时不硬当 zstd', () => {

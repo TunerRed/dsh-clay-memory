@@ -66,7 +66,10 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
           if (!选中) {
             const 想要 = (r.会话们 || []).find((x) => x.会话 === 想要的会话)
             if (想要) set选中(想要.文件)
-            else if (r.会话们 && r.会话们.length) set选中(r.会话们[0].文件)
+            // 1.12.86 修：从会话详情进来却找不到这个会话时，**绝不悄悄换一个** ——
+            //   之前这里会 fallback 到列表第一个，于是「提取」出来的其实是别的会话的内容，
+            //   用户完全看不出来（2026-11-22 主人实测撞到）。
+            else if (!想要的会话 && r.会话们 && r.会话们.length) set选中(r.会话们[0].文件)
           }
         })
         .catch((e) => set错(String((e && e.message) || e)))
@@ -220,7 +223,15 @@ export function 造补记页({ React, el, get, post, S, 初始会话 }) {
             ),
           ),
 
-      直接进 ? el('div', { style: { ...S.dim, marginTop: 6 } }, '补记的就是这个会话，不用再挑。') : null,
+      直接进
+        ? el(
+            'div',
+            { style: { ...S.dim, marginTop: 6 } },
+            选中
+              ? '补记的就是这个会话，不用再挑。'
+              : '这个会话还不在可补记的范围里：要至少 6 条真正对话、而且我至少回过 2 句（太短的会话补记没意义，也容易把整段闲聊当事实记下来）。',
+          )
+        : null,
 
       // ── 第二步：预览 ──
       el('div', { style: S.sec }, el('div', { style: S.secH }, el('span', { style: S.secTitle }, '看它想记什么'))),

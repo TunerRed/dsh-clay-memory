@@ -4,6 +4,7 @@ node_modules/
 # 调试脚本与临时产物
 tmp/
 *.log
+docs/
 
 # 备份 / 原子写留下的副本
 *.bak

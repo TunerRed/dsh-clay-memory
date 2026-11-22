@@ -181,6 +181,19 @@ test('兜底有字、事件或项目 picked、仅骨架输出都不算整体空�
   assert.equal(result.注入.空注入, 1)
 })
 
+test('零召回：兜底写了几十个字，也当「一条记忆都没召回到」', () => {
+  const result = analyze([
+    trace({ turn: 1, fallback: true, 字: 25 }),
+    trace({ turn: 2, picked: ['k'] }),
+  ])
+  assert.equal(result.整体注入.零召回的轮, 1)
+  assert.equal(result.整体注入.零召回率, 50)
+  assert.equal(result.整体注入.兜底轮数, 1)
+  // 空注入量的是「注入区有没有字」，兜底那轮有字；零召回量的是「有没有召回到记忆」，它没有。
+  assert.equal(result.整体注入.非空注入, 2)
+  assert.equal(result.整体注入.空注入, 0)
+})
+
 test('缺 picked 时 selectedMeta 仍证明事件非空，空元数据不回退到当前事实', () => {
   const result = analyze([
     trace({ turn: 1, picked: undefined, selectedMeta: [{ id: 'e', scope: 'session', isKnowledge: false, chars: 5 }] }),

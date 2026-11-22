@@ -1,0 +1,198 @@
+#!/usr/bin/env node
+/**
+ * 从 dsh-clay-memory 的 *.traces.jsonl 中按日期分层抽样空 picked 记录
+ * 默认：2026-11-22，短句（<=8字）10 条 + 中长句（>8字）20 条
+ *
+ * 用法示例：
+ *   node sample-empty-traces.mjs
+ *   node sample-empty-traces.mjs --date 2026-11-22 --exclude <开发会话ID>
+ *   node sample-empty-traces.mjs --dir "C:\Users\你\.dsh\clay-memory" --seed 42
+ */
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+function parseArgs(argv) {
+  const args = {
+    dir: path.join(process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), 'clay-memory'),
+    date: '2026-11-22',
+    shortCount: 10,
+    longCount: 20,
+    shortMaxLen: 8,
+    exclude: new Set(),
+    seed: null,
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const k = argv[i];
+    const v = argv[i + 1];
+    if (k === '--dir' && v) { args.dir = v; i++; }
+    else if (k === '--date' && v) { args.date = v; i++; }
+    else if (k === '--short' && v) { args.shortCount = Number(v); i++; }
+    else if (k === '--long' && v) { args.longCount = Number(v); i++; }
+    else if (k === '--max-short-len' && v) { args.shortMaxLen = Number(v); i++; }
+    else if (k === '--exclude' && v) {
+      v.split(',').map(s => s.trim()).filter(Boolean).forEach(s => args.exclude.add(s));
+      i++;
+    }
+    else if (k === '--seed' && v) { args.seed = Number(v); i++; }
+  }
+  return args;
+}
+
+function makeRng(seed) {
+  if (seed === null || Number.isNaN(seed)) return Math.random;
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function shuffle(arr, rng) {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function toLocalDateStr(val) {
+  if (val == null) return null;
+  if (typeof val === 'string') {
+    const m = val.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m && !val.endsWith('Z')) return m[1];
+    const d = new Date(val);
+    if (!Number.isNaN(d.getTime())) return formatLocalDate(d);
+    return null;
+  }
+  if (typeof val === 'number') {
+    const ms = val < 1e12 ? val * 1000 : val;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : formatLocalDate(d);
+  }
+  return null;
+}
+
+function formatLocalDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function extractDate(rec) {
+  const raw = rec.ts ?? rec.time ?? rec.at ?? rec.timestamp ?? rec.createdAt ?? rec.date;
+  return toLocalDateStr(raw);
+}
+
+function cleanQuery(q) {
+  return String(q ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function printGroup(title, items) {
+  console.log(`\n=== ${title}（抽到 ${items.length} 条）===`);
+  console.log('编号 | 会话前8位 | 字数 | gate/limit    | fallback | 注入字 | query');
+  console.log('-'.repeat(92));
+  items.forEach((it, idx) => {
+    const no = String(idx + 1).padStart(2, '0');
+    const sid = it.sid.slice(0, 8).padEnd(8, ' ');
+    const len = String(it.qLen).padStart(4, ' ');
+    const gateStr = `${it.gate ?? '-'}/${it.gateLimit ?? '-'}`.padEnd(13, ' ');
+    const fb = String(it.fallback || 'none').padEnd(8, ' ');
+    const chars = String(it.chars ?? 0).padStart(6, ' ');
+    const q = it.query.length > 100 ? `${it.query.slice(0, 100)}…` : it.query;
+    console.log(`${no}   | ${sid}  | ${len} | ${gateStr} | ${fb} | ${chars} | ${q}`);
+  });
+}
+
+function main() {
+  const cfg = parseArgs(process.argv.slice(2));
+  if (!fs.existsSync(cfg.dir)) {
+    console.error(`目录不存在: ${cfg.dir}\n请用 --dir 指定 clay-memory 目录路径。`);
+    process.exit(1);
+  }
+
+  const files = fs.readdirSync(cfg.dir).filter(f => f.endsWith('.traces.jsonl'));
+  if (files.length === 0) {
+    console.error(`在 ${cfg.dir} 下未找到 *.traces.jsonl 文件。`);
+    process.exit(1);
+  }
+
+  let totalOnDate = 0;
+  let emptyOnDate = 0;
+  let emptyWithFallback = 0;
+  const shortPool = [];
+  const longPool = [];
+  let sampleKeys = null;
+
+  for (const file of files) {
+    const sid = file.replace(/\.traces\.jsonl$/, '');
+    if ([...cfg.exclude].some(ex => sid === ex || sid.startsWith(ex))) continue;
+
+    const lines = fs.readFileSync(path.join(cfg.dir, file), 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let rec;
+      try {
+        rec = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (!sampleKeys) sampleKeys = Object.keys(rec);
+
+      const d = extractDate(rec);
+      if (d !== cfg.date && !(d && d.endsWith(cfg.date))) continue;
+      totalOnDate++;
+
+      const picked = Array.isArray(rec.picked) ? rec.picked : [];
+      if (picked.length > 0) continue;
+
+      emptyOnDate++;
+      if (rec.fallback) emptyWithFallback++;
+
+      const query = cleanQuery(rec.query);
+      const qLen = [...query].length;
+      const item = {
+        sid,
+        query,
+        qLen,
+        gate: rec.gate,
+        gateLimit: rec.gateLimit,
+        fallback: rec.fallback || null,
+        chars: rec['字'] ?? rec.chars ?? 0,
+      };
+
+      if (qLen <= cfg.shortMaxLen) shortPool.push(item);
+      else longPool.push(item);
+    }
+  }
+
+  console.log(`目录: ${cfg.dir}`);
+  console.log(`日期: ${cfg.date} | 扫描 trace 文件: ${files.length} 个`);
+  console.log(
+    `当日总轮次: ${totalOnDate} | 空 picked: ${emptyOnDate} (${
+      totalOnDate ? ((emptyOnDate / totalOnDate) * 100).toFixed(1) : '0.0'
+    }%) | 其中带 fallback: ${emptyWithFallback}`
+  );
+  console.log(
+    `空 picked 分布: 短句(<=${cfg.shortMaxLen}字) ${shortPool.length} 条 · 中长句(>${cfg.shortMaxLen}字) ${longPool.length} 条`
+  );
+
+  if (totalOnDate === 0 && sampleKeys) {
+    console.log(`\n提示: 未匹配到 ${cfg.date} 的记录。检测到单条 trace 字段为: ${sampleKeys.join(', ')}`);
+    return;
+  }
+
+  const rng = makeRng(cfg.seed);
+  const sampledShort = shuffle(shortPool, rng).slice(0, cfg.shortCount);
+  const sampledLong = shuffle(longPool, rng).slice(0, cfg.longCount);
+
+  printGroup(`短句样本（<=${cfg.shortMaxLen}字）`, sampledShort);
+  printGroup(`中长句样本（>${cfg.shortMaxLen}字）`, sampledLong);
+
+  console.log('\n打标参考: [1]正常空  [2]判意图误杀  [3]词面C=0漏召回  [4]库里本来没记');
+}
+
+main();

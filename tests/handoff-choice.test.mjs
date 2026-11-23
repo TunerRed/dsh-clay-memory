@@ -204,3 +204,42 @@ test('注入前的净化：正常的长回复不能剪（没有同前缀的两�
   assert.ok(文.includes('先看结论'), '开头得在')
   assert.ok(文.includes('要是还炸'), '结尾也得在')
 })
+
+// ── 注入路径的「算 + 锁」（1.12.92）─────────────────────────────────
+// 外部评审 2026-11-23 指出两个会让「页面选择」静默失效的坑：
+//   ① 全局 off 时挂载前判一次就省掉钩子 → 之后选「加载」不生效
+//   ② 空白页预热求值一次就把 锁定 写成空串 → 之后选了也不生效
+
+test('算热尾与锁：空白页（0 句）只算不锁，选来源后立刻能用', () => {
+  清盘()
+  m.记热尾('session-old', '今天外面下雨了', '那主人带伞了吗')
+  // 空白页先求值一次：还没有选择 → 空，但**不许锁死**
+  const 一 = m.算热尾与锁('session-new', 'off', 0, null)
+  assert.equal(一.文, '')
+  assert.equal(一.锁定, null, '空白页不能锁')
+  // 用户在页面上选了「最近那段」（全局是 off，选择优先）
+  m.写选择('session-new', { load: true, from: '', turns: [] })
+  const 二 = m.算热尾与锁('session-new', 'off', 0, 一.锁定)
+  assert.ok(二.文.includes('今天外面下雨了'), '选了就该注进来')
+})
+
+test('算热尾与锁：第一句发出后锁定，之后改选择不再变', () => {
+  清盘()
+  m.记热尾('session-old', '今天外面下雨了', '那主人带伞了吗')
+  m.写选择('session-new', { load: true, from: '', turns: [] })
+  const 一 = m.算热尾与锁('session-new', 'latest', 1, null)
+  assert.ok(一.文.includes('今天外面下雨了'))
+  assert.equal(一.锁定, 一.文, '第一句发出后要锁')
+  // 锁住之后换选择也不动
+  m.写选择('session-new', { load: false, from: '', turns: [] })
+  const 二 = m.算热尾与锁('session-new', 'latest', 1, 一.锁定)
+  assert.equal(二.文, 一.文)
+})
+
+test('算热尾与锁：已经在聊的会话永久不接', () => {
+  清盘()
+  m.记热尾('session-old', '今天外面下雨了', '那主人带伞了吗')
+  const r = m.算热尾与锁('session-new', 'latest', 2, null)
+  assert.equal(r.文, '')
+  assert.equal(r.锁定, '', '老会话要判死')
+})

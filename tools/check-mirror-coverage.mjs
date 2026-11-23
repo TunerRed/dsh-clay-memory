@@ -17,6 +17,10 @@ const 仓库根 = fileURLToPath(new URL('..', import.meta.url))
 const 输出JSON = process.argv.includes('--json')
 
 const { STORE_DIR } = await import(pathToFileURL(path.join(仓库根, 'lib/paths.mjs')).href)
+// ⭐ 2026-11-23：判定口径跟着 lib/store-core.mjs 走，不再自己维护一份白名单。
+//   打包杂项 已改成「黑名单」：除主列键外的一切字段都会进 meta_json → 不会漏。
+//   于是这里真正要抓的变成另一半：**主列键声明了、schema 却没这列**（写不进去）。
+const { 主列键们 } = await import(pathToFileURL(path.join(仓库根, 'lib/store-core.mjs')).href)
 
 // 镜像列 ↔ JSON 字段的对应（列名 → 字段名；不写死的用括号说明它是内部列）
 const 列映射 = {
@@ -46,22 +50,20 @@ const 列映射 = {
   ord: '(顺序)',
 }
 
-// meta_json 的白名单 —— ⚠ 必须与 lib/store-core.mjs 的 打包杂项() 完全一致
-const 杂项白名单 = [
-  'tags', 'emotion', 'nature', '原话', 'ctx',
-  'reinforcedAt', 'lastReinforcedDay', 'relatedAt', 'importBatch', 'importAt',
-  'refinedAt', 'typeChecked', 'stableChecked',
-  '洗键过', '键来源', 'refineTries', 'refineFailed', 'editedAt',
-  '已被取代', '别记',
-]
+// meta_json 的打包口径 = lib/store-core.mjs 的 打包杂项()（黑名单，除主列键外全收）
+// 所以「会不会漏字段」不再靠名单判断，只靠一条：主列键是否都有列。
 
 if (!fs.existsSync(STORE_DIR)) {
   console.error('找不到库目录：' + STORE_DIR + '（DSH_HOME 设了吗？）')
   process.exit(2)
 }
 
-const 已覆盖 = new Set(Object.values(列映射).filter((x) => !x.startsWith('(')))
-for (const k of 杂项白名单) 已覆盖.add(k)
+const 有列的字段 = new Set(Object.values(列映射).filter((x) => !x.startsWith('(')))
+const 内部键 = new Set(['__层'])
+// 主列键声明了却没列 = 写不进镜像（真正会丢数据的那一半）
+const 主列缺列 = [...主列键们].filter((k) => !内部键.has(k) && !有列的字段.has(k))
+// 其余字段一律进 meta_json（黑名单打包），不会漏 —— 只用来报告「哪些走的是打包通道」
+const 走打包 = (k) => !主列键们.has(k) && !有列的字段.has(k)
 
 const 字段 = new Map()
 let 总条 = 0
@@ -82,13 +84,15 @@ for (const fn of fs.readdirSync(STORE_DIR).filter((f) => f.endsWith('.json'))) {
   }
 }
 
-const 漏 = [...字段.entries()].filter(([k]) => !已覆盖.has(k)).sort((a, b) => b[1] - a[1])
+const 打包通道 = [...字段.entries()].filter(([k]) => 走打包(k)).sort((a, b) => b[1] - a[1])
+const 漏 = 主列缺列
 
 const 结果 = {
   库目录: STORE_DIR,
   记忆条数: 总条,
   字段数: 字段.size,
-  漏掉的字段: 漏.map(([名, 条数]) => ({ 字段: 名, 条数 })),
+  漏掉的字段: 漏.map((名) => ({ 字段: 名, 条数: 字段.get(名) || 0 })),
+  走打包的字段: 打包通道.map(([名, 条数]) => ({ 字段: 名, 条数 })),
 }
 
 if (输出JSON) {
@@ -98,13 +102,12 @@ if (输出JSON) {
   console.log('扫了 ' + 总条 + ' 条记忆、' + 字段.size + ' 个字段')
   console.log('')
   if (!漏.length) {
-    console.log('✓ 字段全部覆盖（列 + meta_json 白名单）')
+    console.log('✓ 主列键全部有列；其余 ' + 打包通道.length + ' 个字段走 meta_json（黑名单全收，不会漏）')
   } else {
-    console.log('✗ 有 ' + 漏.length + ' 个字段没进镜像：')
-    for (const [名, 条数] of 漏) console.log('   ' + 名.padEnd(22) + 条数 + ' 条')
+    console.log('✗ 有 ' + 漏.length + ' 个主列键在 schema 里没有对应列（写不进镜像）：')
+    for (const 名 of 漏) console.log('   ' + 名.padEnd(22) + (字段.get(名) || 0) + ' 条')
     console.log('')
-    console.log('处理：加进 lib/store-core.mjs 的 杂项键们（和 tools/migrate-to-sqlite.mjs 的白名单），')
-    console.log('      再重建镜像（全量回填）。行为字段（nature/原话/ctx 这类）漏了会改变注入结果。')
+    console.log('处理：要么给 schema 加列，要么把它从 lib/store-core.mjs 的 主列键们 里挪走（挪走就自动进 meta_json）。')
   }
 }
 

@@ -1,3 +1,36 @@
+## 1.12.91（2026-11-23）
+
+新会话「继承语感」：开新会话时能接上一段的语感（只接最后 6 轮原话，不搬全史）。顺带治掉镜像漏字段、热尾一直没写盘两个坑。
+
+**1. 热尾一直没写盘 —— 正文取错了一层**
+`session/event` 回调里读的是 `event.data.content`，而 `assistant/message` 的真实形状是 `{turn, step, message:{role, content}, usage, stream}`，
+正文在 `event.data.message.content`。于是 `段 = []` → `文 = ''` → `if (!文) return` 把整段吞掉：**不报错、不打日志**，
+热尾一次都没写出去，下游的「使用判定」也一直没跑。
+和 1.12.88 在 `lib/archive-reader.mjs` 踩的是同一个坑（同一个形状读错两次），这次两种形状都兼容。
+
+**2. 从「全插件一份的热尾」改成按会话选来源**
+- 写侧：`记热尾(sid, lastUserTextOf(session) || lastText, 文)` —— 不再拿全插件共享的 `lastText`，多会话并发不会把 A 的原话写进 B 的热尾
+- 读侧：`lib/handoff.mjs` 新增选择层（`读选择`/`写选择`/`从归档取热尾`/`热尾文本`），`_handoff_choice.json` 按会话记「接哪一段 / 不接」
+- 挑老会话时从会话归档预抽最后 6 轮（`lib/archive-reader.mjs` 的 `取对话`），所以死会话、久远会话也能接
+- 乱码轮（回填留下的 U+FFFD）直接跳过——实测某个会话 5 轮里有 2 轮是乱码，接进去是纯噪音
+
+**3. 让用户自己选**
+- 新会话空白页那行（`conversation.hero.options` 座位）多了 `继承语感` 下拉：最近那段 / 不加载 / 挑最近 10 个会话（★ 标当前热尾源）
+- 设置 → 黏土记忆 → 高级 加了全局默认（默认接最近那段 / 每次新建时自己选 / 不接）
+- 路由：`GET /dsh-clay-memory/handoff`、`/handoff/candidates`、`POST /handoff/choose`、`GET|POST /handoff/mode`
+- 挂载时按选择动态求值后**锁死**：说过话的老会话（用户句 > 1）永久不接，只在冷启动那一刻注入一次
+
+**4. 镜像（SQLite）漏字段 + 漏工作区层**
+- `打包杂项()` 从白名单反转成黑名单：以前只收 22 个写死的键，实测 596 条记忆 47 个字段里有 7 个没进镜像
+  （`episode` 103 条 / `fromSession` 103 / `expireAt` 20 / `删除原因` 10 / `合并掉的` 4 / `合并进了` 4 / `evidence` 1）。
+  名单原来在 `lib/store-core.mjs` / `tools/migrate-to-sqlite.mjs` / `tools/check-mirror-coverage.mjs` **三处手抄**，
+  现在统一成 `lib/store-core.mjs` 导出的 `主列键们` + `打包杂项`，另两处直接 import。
+  其中 `expireAt` 是打分输入（`lib/scoring.mjs:511` 读它判过期），漏了等于读切后 state 型经历永不过期
+- `tools/migrate-to-sqlite.mjs` 以前把 `_ws-*.json` 整层排除，工作区记忆从没进过镜像；现在补上，层次顺序 global → workspace → session
+
+**验证**：`845 用例（841 过 / 4 跳过 / 0 失败，2026-11-23 实测）`、`check:client` ✓、影子比对 3/3 会话全等（不等 0）、
+镜像 580 活行 + 16 墓碑与 JSON 顺序全等；真机三条都过（新会话注入 / 选「不加载」不注入 / 6 句的老会话不注入）。
+
 ## 1.12.90（2026-11-22）
 
 注入缓存从「全插件一份」改成**按会话分表**，治掉 runtime-context 快照成组追加的根。

@@ -11,6 +11,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+// 杂项/推理的打包口径与插件写路径**共用同一份实现** —— 以前这里抄了一份白名单，
+// 2026-11-23 实测三处手同步漏了 7 个字段（expireAt / fromSession / 合并自 …）。
+import { 打包杂项, 打包推理 } from '../lib/store-core.mjs'
+import { 工作区文件id } from '../lib/paths.mjs'
 
 const HOME = process.env.CLAY_HOME || path.join(process.env.DSH_HOME || '', 'clay-memory')
 const DB_PATH = path.join(HOME, 'clay-memory.db')
@@ -76,11 +80,33 @@ for (const m of 事实盘.memories || []) {
   事实们.push({ m, sid: '' })
 }
 
+// 工作区库：`_ws-*.json` 单独读（是会话文件 会排除 `_` 前缀文件）。
+// ⭐ 2026-11-23：以前这里只迁「事实 + 会话」两层，工作区层的条目**整层没进镜像**
+//   —— 测试库实测 session 视图 568 条 / 镜像 567 条，差的正是工作区那一条；
+//   读切之后工作区记忆会凭空消失。wsRoot 优先取文件里的字段，老文件没有则从文件名反推。
+const 工区盘们 = []
+for (const fn of fs.readdirSync(HOME).filter((f) => f.startsWith('_ws-') && f.endsWith('.json'))) {
+  const 盘 = 读JSON(path.join(HOME, fn)) || { memories: [], deleted: [] }
+  const 根 = typeof 盘.wsRoot === 'string' && 盘.wsRoot ? 盘.wsRoot : 工作区文件id(fn)
+  if (!根) continue
+  工区盘们.push({ sid: 根, 盘 })
+}
+
 // 每个会话：事实（跳过已见）+ 本会话事件
+// ⚠ 层次顺序必须跟读视图的 order by（global → workspace → session）一致，否则 ord 一乱、顺序全等就假红。
 const 全 = []
 let ord = 0
 for (const { m } of 事实们) {
   全.push({ m, scope: 'global', sid: '', ord: ord++ })
+}
+for (const { sid, 盘 } of 工区盘们) {
+  for (const m of 盘.memories || []) {
+    if (!m || !m.id) continue
+    const id = String(m.id)
+    if (见过id.has(id)) continue
+    见过id.add(id)
+    全.push({ m, scope: 'workspace', sid, ord: ord++ })
+  }
 }
 for (const { sid, 盘 } of 会话盘们) {
   for (const m of 盘.memories || []) {
@@ -97,13 +123,14 @@ for (const { sid, 盘 } of 会话盘们) {
 const 坟 = new Map()
 for (const d of 事实盘.deleted || []) if (d && d.id) 坟.set(String(d.id), d)
 for (const { 盘 } of 会话盘们) for (const d of 盘.deleted || []) if (d && d.id && !坟.has(String(d.id))) 坟.set(String(d.id), d)
+for (const { 盘 } of 工区盘们) for (const d of 盘.deleted || []) if (d && d.id && !坟.has(String(d.id))) 坟.set(String(d.id), d)
 
 const 活着 = 全.filter((x) => !坟.has(String(x.m.id)))
 const 删了 = [...坟.values()].map((m) => {
   const 全条 = 全.find((x) => String(x.m.id) === String(m.id))
   return {
     m,
-    scope: m.category === 'stable_profile' ? 'global' : 'session',
+    scope: 全条 ? 全条.scope : m.category === 'stable_profile' ? 'global' : 'session',
     sid: 全条 ? 全条.sid : '',
     ord: 全条 ? 全条.ord : ord++,
   }
@@ -112,7 +139,8 @@ const 删了 = [...坟.values()].map((m) => {
 console.log('源目录：' + HOME)
 console.log('  事实库 ' + (事实盘.memories || []).length + ' 条（去重后 ' + 事实们.length + '）')
 console.log('  会话库 ' + 会话盘们.length + ' 个')
-console.log('  合并后活着 ' + 活着.length + ' 条（全局 ' + 活着.filter((x) => x.scope === 'global').length + ' / 会话 ' + 活着.filter((x) => x.scope === 'session').length + '）')
+console.log('  工作区库 ' + 工区盘们.length + ' 个')
+console.log('  合并后活着 ' + 活着.length + ' 条（全局 ' + 活着.filter((x) => x.scope === 'global').length + ' / 工作区 ' + 活着.filter((x) => x.scope === 'workspace').length + ' / 会话 ' + 活着.filter((x) => x.scope === 'session').length + '）')
 console.log('  墓碑 ' + 删了.length + ' 条')
 
 if (!APPLY) {
@@ -184,39 +212,9 @@ const ins = db.prepare(`INSERT INTO memory
   (id, scope, session_id, text, at, created_at, importance, source, category, type, fact_key, related_json, extra_json, text_before, refined, refined_skip, superseded_why, wrong, ord, deleted_at, activation0, activation_anchor, reinforce_count, is_knowledge, meta_json)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 
-// 杂项白名单（与 lib/store-core.mjs 的 打包杂项 保持一致）
-const 杂项键们 = [
-  'tags', 'emotion', 'nature', '原话', 'ctx',
-  'reinforcedAt', 'lastReinforcedDay', 'relatedAt', 'importBatch', 'importAt',
-  'refinedAt', 'typeChecked', 'stableChecked',
-  '洗键过', '键来源', 'refineTries', 'refineFailed', 'editedAt',
-  '已被取代', '别记',
-]
-function 打包杂项(m) {
-  if (!m) return null
-  const 包 = {}
-  for (const k of 杂项键们) {
-    const v = m[k]
-    if (v === undefined || v === null) continue
-    包[k] = v
-  }
-  return Object.keys(包).length ? JSON.stringify(包) : null
-}
+// 杂项/推理打包直接复用 lib/store-core.mjs 的实现（见文件头 import）——这里不再保留副本。
 
 const tx = db.transaction ? db.transaction(run) : null
-// GPT 整改 P2（inference）：推测专属字段打包进 extra_json（与 store-core.mjs 的 打包推理 同构）
-function 打包推理(m) {
-  if (!m || m.type !== 'inference') return null
-  const 包 = {}
-  if (Array.isArray(m.evidence)) 包.evidence = m.evidence
-  if (typeof m.confidence === 'string') 包.confidence = m.confidence
-  if (typeof m.status === 'string') 包.status = m.status
-  if (typeof m.推断域 === 'string') 包.推断域 = m.推断域
-  if (typeof m.provenance === 'string') 包.provenance = m.provenance
-  if (typeof m.confirmedAt === 'string') 包.confirmedAt = m.confirmedAt
-  if (typeof m.rejectedAt === 'string') 包.rejectedAt = m.rejectedAt
-  return JSON.stringify(包)
-}
 function run() {
   for (const { m, scope, sid, ord } of [...活着, ...删了]) {
     ins.run(
@@ -258,8 +256,8 @@ db.prepare('INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)').run('src_dir', HOME
 // 读视图只认「镜像有货」标记（1.8.28），迁移产物也算有货
 db.prepare('INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)').run('mirrored', '1')
 
-// ── 3. 出口校验：读回来的视图 vs 源
-const 读回 = db.prepare('select id, scope, session_id, ord from memory where deleted_at is null order by ord').all()
+// ── 3. 出口校验：读回来的视图 vs 源（排序口径与 读SQL视图 一致：global → workspace → session，再按 ord）
+const 读回 = db.prepare("select id, scope, session_id, ord from memory where deleted_at is null order by case scope when 'global' then 0 when 'workspace' then 1 else 2 end, ord").all()
 const 源id = 活着.map((x) => String(x.m.id))
 const 回id = 读回.map((r) => String(r.id))
 let ok = true
@@ -270,10 +268,11 @@ else {
   }
 }
 const 回全局 = 读回.filter((r) => r.scope === 'global').length
+const 回工区 = 读回.filter((r) => r.scope === 'workspace').length
 const 回会话 = 读回.filter((r) => r.scope === 'session').length
 console.log('')
 console.log('写完了：' + DB_PATH)
-console.log('  活着的行 ' + 读回.length + '（全局 ' + 回全局 + ' / 会话 ' + 回会话 + '）')
+console.log('  活着的行 ' + 读回.length + '（全局 ' + 回全局 + ' / 工作区 ' + 回工区 + ' / 会话 ' + 回会话 + '）')
 console.log('  墓碑行 ' + db.prepare('select count(*) c from memory where deleted_at is not null').get().c)
 console.log('  顺序全等：' + (ok ? '✓' : '✗'))
 db.close()

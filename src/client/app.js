@@ -7,6 +7,7 @@ import { 造回收站页 } from './pages/recycle.js'
 import { 造回复体检页 } from './pages/checkup.js'
 import { 造拦截页 } from './pages/guard.js'
 import { 造补记页 } from './pages/backfill.js' // 1.12.84：F25 历史补记（选会话 → 预览 → 写进批次 → 撤销）
+import { 造语感控件 } from './pages/handoff.js' // 1.12.91：新会话「继承语感」（接最近那段 / 不加载 / 挑一个）
 
 // DSH 黏土记忆 · 客户端正文（由加载器调用）
 export function 装客户端(require) {
@@ -703,6 +704,20 @@ const 洗键进度 = { 已: 0, 总: 0, 在跑: false, 干跑: false }
             label: () => '黏土记忆',
           },
           () => el(记忆面板),
+        ),
+      )
+      // ⭐ 1.12.91：新会话空白页那行右侧 —— 这个新会话要不要接上一段对话的尾巴
+      //   ⚠ 注册回调必须写成 (props) => ...，裸用 props 是 ReferenceError（被兜底接住，测试不报）
+      const 继承语感控件 = 造语感控件({ React, el, get, post })
+      slots.inject('conversation.hero.options', () =>
+        slots.register(
+          {
+            name: 'conversation.hero.options',
+            id: 'clay-handoff',
+            order: 10,
+            label: '继承语感',
+          },
+          (props) => el(继承语感控件, { sessionId: props && props.sessionId }),
         ),
       )
     }

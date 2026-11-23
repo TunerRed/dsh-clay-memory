@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { zstdCompressSync } from 'node:zlib'
 
 const 沙盒 = mkdtempSync(join(tmpdir(), 'clay-handoff-choice-'))
 process.env.DSH_HOME = 沙盒
@@ -43,7 +44,7 @@ test('选择：选「不加载」时 load=false，热尾文本一律空', () => 
 test('选择：挑一个以前的会话 → 用存下来的快照', () => {
   清盘()
   m.记热尾('session-最新', '最新那句', '最新的回复')
-  m.写选择('session-new', { load: true, from: 'session-老会话', turns: [{ u: '老原话', a: '老回复', at: 1 }] })
+  m.写选择('session-new', { load: true, from: 'session-老会话', turns: [{ u: '老原话', a: '老回复内容', at: 1 }] })
   const 文 = m.热尾文本('session-new', 'latest')
   assert.ok(文.includes('老原话'), '应该用快照里的老原话')
   assert.ok(!文.includes('最新那句'), '不能混进最近那段')
@@ -90,4 +91,116 @@ test('从归档取热尾：真归档里抽出 user→assistant 配对，乱码�
   //   —— 走的是取对话()的输出，用不到 zstd，所以用不到真文件；上面那条已保证读不到时给空
   清盘()
   assert.deepEqual(m.从归档取热尾('session-空'), [])
+})
+
+// 2026-11-23 主实例暴露：选「挑一个会话」时，抽出来的热尾里混着
+//   ① 宿主拼的「请查看附件 + 本机收件路径」② 同一个主人句配了两版回复。
+// 这两条都出在 从归档取热尾，所以这里造一份真归档（一帧 zstd + JSONL）来钉住。
+function 造归档(区, sid, 事件们) {
+  const 目录 = join(沙盒, 'sessions', 区, sid)
+  mkdirSync(目录, { recursive: true })
+  const 文本 = 事件们.map((e) => JSON.stringify(e)).join('\n')
+  writeFileSync(join(目录, 'session.v4.jsonl.zstd'), zstdCompressSync(Buffer.from(文本, 'utf8')))
+}
+
+const 造用户 = (text, seq) => ({
+  type: 'user/message',
+  seq,
+  time: 1000 + seq,
+  data: { source: { kind: 'user' }, content: [{ type: 'text', text }] },
+})
+const 造助手 = (text, seq) => ({
+  type: 'assistant/message',
+  seq,
+  time: 1000 + seq,
+  data: { message: { role: 'assistant', content: [{ type: 'text', text }] } },
+})
+
+test('从归档取热尾：宿主注入的附件落地通知不抽进热尾', () => {
+  清盘()
+  造归档('ws-demo', 'session-有附件', [
+    造用户('今天午饭吃啥', 1),
+    造助手('大白饭！这还用问', 2),
+    造用户('请查看附件\n\n用户从 QQ 发来的附件已保存到工作区。\n- 图片 /tmp/x/.dsh-inbox/1795.jpg', 3),
+    造助手('看到了，是张猫图', 4),
+  ])
+  const turns = m.从归档取热尾('session-有附件')
+  assert.equal(turns.length, 1, '只该剩那轮真对话')
+  assert.equal(turns[0].u, '今天午饭吃啥')
+  assert.ok(!JSON.stringify(turns).includes('.dsh-inbox'), '不能把本机路径抽进来')
+})
+
+test('从归档取热尾：同一个主人句配了多版回复 → 只留最后一版', () => {
+  清盘()
+  造归档('ws-demo', 'session-重试', [
+    造用户('今天那个镜像同步崩了', 1),
+    造助手('回滚到哪个快照', 2),
+    造用户('今天那个镜像同步崩了', 3),
+    造助手('回滚到哪个点', 4),
+  ])
+  const turns = m.从归档取热尾('session-重试')
+  assert.equal(turns.length, 1, '同一句话不能留两轮')
+  assert.equal(turns[0].a, '回滚到哪个点')
+})
+
+// 存量快照（1.12.91 之前抽的）里可能还躺着脏轮，注入前要再洗一遍，
+// 不然修好了新数据、旧会话点开还是老样子。
+test('注入前的净化：旧快照里的宿主注入句 / 重复回复在渲染时被滤掉', () => {
+  清盘()
+  m.写选择('session-new', {
+    load: true,
+    from: 'session-旧的',
+    turns: [
+      { u: '请查看附件\n\n用户从 QQ 发来的附件已保存到工作区。\n- 图片 /tmp/x/.dsh-inbox/a.jpg', a: '看到了，是张猫图', at: 1 },
+      { u: '今天那个镜像同步崩了', a: '回滚到哪个快照', at: 2 },
+      { u: '今天那个镜像同步崩了', a: '回滚到哪个点', at: 3 },
+    ],
+  })
+  const 文 = m.热尾文本('session-new', 'latest')
+  assert.ok(!文.includes('.dsh-inbox'), '本机路径不该出现在热尾里')
+  assert.equal((文.match(/今天那个镜像同步崩了/g) || []).length, 1, '同一句话只留一轮')
+  assert.ok(文.includes('回滚到哪个点') && !文.includes('回滚到哪个快照'), '留最后一版回复')
+})
+
+// 2026-11-23 主实例实测：宿主把两次输出并进了同一条 text（两版之间用 \n\n\n 隔开）。
+// 一条消息的去重逻辑碰不到它，只能在注入前按「同前缀的第二个开头」剪。
+const 两版回复 = [
+  '（抬起头）',
+  '',
+  '挂了？哪边出的问题，配置还是依赖那头',
+  '',
+  '（想了想）要是它那条链路也断了，晚上要把什么回滚跟我说一声，我换个法子走',
+  '',
+  '',
+  '挂了？是配置还是依赖那边',
+  '',
+  '（想了想）要是那条链路也断了，晚上要把什么回滚跟我说一声，我换个法子走',
+  '',
+  '话说回来了，你别老自己瞎折腾',
+  '',
+  '（小声）我这儿又没挂',
+].join('\n')
+
+test('注入前的净化：一条回复里塞了两版 → 只留后一版', () => {
+  清盘()
+  m.写选择('session-new', { load: true, from: 'session-旧', turns: [{ u: '今天那个镜像同步崩了', a: 两版回复, at: 1 }] })
+  const 文 = m.热尾文本('session-new', 'latest')
+  assert.ok(!文.includes('哪边出的问题'), '前一版要剪掉')
+  assert.ok(文.includes('是配置还是依赖那边'), '后一版留着')
+  assert.ok(文.includes('我这儿又没挂'), '后一版的结尾也在')
+})
+
+test('注入前的净化：正常的长回复不能剪（没有同前缀的两行）', () => {
+  清盘()
+  const 正常 = [
+    '先看结论：镜像现在是全等 3 个会话，零差异。',
+    '',
+    '再展开讲，这次踩的坑是白名单漏字段，七个字段没进 meta_json。',
+    '',
+    '要是还炸，把新的 diag 丢给我，我再排一遍。',
+  ].join('\n')
+  m.写选择('session-new', { load: true, from: 'session-旧', turns: [{ u: '镜像对上了吗', a: 正常, at: 1 }] })
+  const 文 = m.热尾文本('session-new', 'latest')
+  assert.ok(文.includes('先看结论'), '开头得在')
+  assert.ok(文.includes('要是还炸'), '结尾也得在')
 })
